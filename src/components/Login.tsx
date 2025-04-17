@@ -17,7 +17,7 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (username === 'user' && password === 'password') {
+    if (username === 'root' && password === '1234') {
       onLogin();
     } else {
       setError('Invalid credentials');
@@ -65,3 +65,4 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
     </Card>
   );
 };
+
