@@ -6,6 +6,7 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {ScheduleModal} from '@/components/ScheduleModal';
 import {Schedule} from '@/types';
 import {toast} from '@/hooks/use-toast';
+import {Trash2} from 'lucide-react';
 
 interface SchedulePageProps {
   onLogout: () => void;
@@ -66,6 +67,32 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     }
   };
 
+  const deleteSchedule = async (id: string) => {
+    try {
+      const response = await fetch(`/api/schedules/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Schedule deleted successfully.',
+      });
+      fetchSchedules(); // Refresh schedules after deleting
+    } catch (error: any) {
+      console.error('Failed to delete schedule:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete schedule. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
@@ -80,7 +107,10 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       times: times.map(time => ({
         time,
         supplements: schedulesForDay.filter(schedule => schedule.time === time)
-                                    .map(schedule => schedule.supplement)
+                                    .map(schedule => ({
+                                      id: schedule.id,
+                                      supplement: schedule.supplement
+                                    }))
       }))
     };
   });
@@ -107,8 +137,11 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
             </CardHeader>
             <CardContent>
               {times.map(({time, supplements}) => (
-                <div key={`${day}-${time}`} className="mb-2 p-2 rounded-md bg-secondary">
-                  {supplements.join(', ')} - {time}
+                <div key={`${day}-${time}`} className="mb-2 p-2 rounded-md bg-secondary flex items-center justify-between">
+                  <span>{supplements.map(s => s.supplement).join(', ')} - {time}</span>
+                  <Button variant="ghost" size="icon" onClick={() => deleteSchedule(supplements[0].id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
             </CardContent>
