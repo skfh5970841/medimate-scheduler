@@ -36,8 +36,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
   }, []);
 
   const handleSubmit = () => {
-    if ((supplement || newSupplement) && day && time) {
-      const finalSupplement = newSupplement || supplement;
+    if ((supplement !== 'newSupplement' ? supplement : newSupplement) && day && time) {
+      const finalSupplement = supplement === 'newSupplement' ? newSupplement : supplement;
 
       const newSchedule: Schedule = {
         id: Date.now().toString(), // Generate a unique ID
@@ -75,23 +75,26 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
                     {supplement.name}
                   </SelectItem>
                 ))}
+                <SelectItem value="newSupplement">New Supplement</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="newSupplement" className="text-right">
-              New Supplement
-            </Label>
-            <Input
-              type="text"
-              id="newSupplement"
-              placeholder="Enter new supplement"
-              value={newSupplement}
-              onChange={(e) => setNewSupplement(e.target.value)}
-              className="col-span-3"
-            />
-          </div>
+          {supplement === 'newSupplement' && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="newSupplement" className="text-right">
+                New Supplement
+              </Label>
+              <Input
+                type="text"
+                id="newSupplement"
+                placeholder="Enter new supplement"
+                value={newSupplement}
+                onChange={(e) => setNewSupplement(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="day" className="text-right">
