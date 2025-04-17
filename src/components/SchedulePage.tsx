@@ -15,9 +15,18 @@ interface SchedulePageProps {
 export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [username, setUsername] = useState<string>('');
 
   useEffect(() => {
     fetchSchedules();
+  }, []);
+
+  useEffect(() => {
+    // Retrieve username from localStorage on component mount
+    const storedUsername = localStorage.getItem('username');
+    if (storedUsername) {
+      setUsername(storedUsername);
+    }
   }, []);
 
   useEffect(() => {
@@ -140,10 +149,26 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     };
   });
 
+  const now = new Date();
+  const currentDay = now.toLocaleDateString('en-US', {weekday: 'long'});
+  const currentDate = now.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Weekly Schedule</h1>
+       <div>
+            {username && <span className="mr-4">Logged in as: {username}</span>}
+          </div>
+        <div>
+          <h1 className="text-2xl font-bold">Weekly Schedule</h1>
+          <p className="text-muted-foreground">
+            {currentDate}, {currentDay}
+          </p>
+        </div>
         <div>
           <Button onClick={openModal} className="mr-2">
             Add Schedule
