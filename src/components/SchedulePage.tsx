@@ -20,6 +20,31 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     fetchSchedules();
   }, []);
 
+  useEffect(() => {
+    const checkSchedules = () => {
+      const now = new Date();
+      const currentDay = now.toLocaleDateString('en-US', {weekday: 'long'});
+      const currentTime = now.toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit'});
+
+      schedules.forEach(schedule => {
+        if (schedule.day === currentDay && schedule.time === currentTime) {
+          // Check if notification has already been shown today for this schedule
+          const notificationKey = `notificationShown-${schedule.id}-${now.toLocaleDateString()}`;
+          if (!localStorage.getItem(notificationKey)) {
+            alert(`Time to take your ${schedule.supplement}!`);
+            localStorage.setItem(notificationKey, 'true'); // Set flag in local storage
+          }
+        }
+      });
+    };
+
+    // Set interval to check schedules every minute
+    const intervalId = setInterval(checkSchedules, 60000);
+
+    // Clear interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [schedules]);
+
   const fetchSchedules = async () => {
     try {
       const response = await fetch('/api/schedules');
