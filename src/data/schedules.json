@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "1744885160960-Monday",
+    "supplement": "비타민 C",
+    "day": "Monday",
+    "time": "20:20"
+  },
+  {
+    "id": "1744885164623-Monday",
+    "supplement": "비타민 E",
+    "day": "Monday",
+    "time": "20:20"
+  }
+]

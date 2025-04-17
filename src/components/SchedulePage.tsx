@@ -187,28 +187,22 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
             </CardHeader>
             <CardContent>
               {times.map(({time, supplements}) => (
-                <div key={`${day}-${time}`} className="mb-2 p-2 rounded-md bg-secondary flex items-center justify-between">
+                <div key={`${day}-${time}`} className="mb-2 p-2 rounded-md bg-secondary flex flex-col">
                   <span>
                     {supplements.map((s, index) => (
-                      <React.Fragment key={s.id}>
-                        {s.supplement}
-                        {index < supplements.length - 1 ? ', ' : ''}
-                      </React.Fragment>
+                      <div key={s.id} className="flex items-center justify-between">
+                        <span>{s.supplement}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteSchedule(s.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ))}
-                     - {time}
+                    <span className="block"> - {time}</span>
                   </span>
-                  <div>
-                    {supplements.map(s => (
-                      <Button
-                        key={s.id}
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteSchedule(s.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    ))}
-                  </div>
                 </div>
               ))}
             </CardContent>
