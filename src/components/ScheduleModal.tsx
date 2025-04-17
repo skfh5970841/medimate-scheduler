@@ -17,6 +17,7 @@ interface ScheduleModalProps {
 
 export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, onAddSchedule}) => {
   const [supplement, setSupplement] = useState('');
+  const [newSupplement, setNewSupplement] = useState('');
   const [day, setDay] = useState('');
   const [time, setTime] = useState('');
   const [supplementsList, setSupplementsList] = useState<Supplement[]>([]);
@@ -35,10 +36,12 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
   }, []);
 
   const handleSubmit = () => {
-    if (supplement && day && time) {
+    if ((supplement || newSupplement) && day && time) {
+      const finalSupplement = newSupplement || supplement;
+
       const newSchedule: Schedule = {
         id: Date.now().toString(), // Generate a unique ID
-        supplement,
+        supplement: finalSupplement,
         day,
         time,
       };
@@ -74,6 +77,20 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="newSupplement" className="text-right">
+              New Supplement
+            </Label>
+            <Input
+              type="text"
+              id="newSupplement"
+              placeholder="Enter new supplement"
+              value={newSupplement}
+              onChange={(e) => setNewSupplement(e.target.value)}
+              className="col-span-3"
+            />
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
