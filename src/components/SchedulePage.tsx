@@ -40,7 +40,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
           // Check if notification has already been shown today for this schedule
           const notificationKey = `notificationShown-${schedule.id}-${now.toLocaleDateString()}`;
           if (!localStorage.getItem(notificationKey)) {
-            alert(`Time to take your ${schedule.supplement}!`);
+            alert(`영양제 섭취 시간입니다. 섭취해야할 영양제 종류 : ${schedule.supplement}`);
             localStorage.setItem(notificationKey, 'true'); // Set flag in local storage
           }
         }
