@@ -1,13 +1,14 @@
 'use client';
 
 import React, {useState, useEffect} from 'react';
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose} from '@/components/ui/dialog';
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose} from '@/components/ui/dialog';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {Button} from '@/components/ui/button';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {getSupplements, Supplement} from '@/services/supplements';
 import {Schedule} from '@/types';
+import {Checkbox} from '@/components/ui/checkbox';
 
 interface ScheduleModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ interface ScheduleModalProps {
 export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, onAddSchedule}) => {
   const [supplement, setSupplement] = useState('');
   const [newSupplement, setNewSupplement] = useState('');
-  const [day, setDay] = useState('');
+  const [days, setDays] = useState<string[]>([]);
   const [time, setTime] = useState('');
   const [supplementsList, setSupplementsList] = useState<Supplement[]>([]);
 
@@ -36,20 +37,32 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
   }, []);
 
   const handleSubmit = () => {
-    if ((supplement !== 'newSupplement' ? supplement : newSupplement) && day && time) {
+    if ((supplement !== 'newSupplement' ? supplement : newSupplement) && days.length > 0 && time) {
       const finalSupplement = supplement === 'newSupplement' ? newSupplement : supplement;
 
-      const newSchedule: Schedule = {
-        id: Date.now().toString(), // Generate a unique ID
-        supplement: finalSupplement,
-        day,
-        time,
-      };
-      onAddSchedule(newSchedule);
+      days.forEach((day) => {
+        const newSchedule: Schedule = {
+          id: Date.now().toString() + '-' + day, // Generate a unique ID including the day
+          supplement: finalSupplement,
+          day,
+          time,
+        };
+        onAddSchedule(newSchedule);
+      });
       onClose();
     } else {
       alert('Please fill in all fields.');
     }
+  };
+
+  const handleDayChange = (day: string) => {
+    setDays((prevDays) => {
+      if (prevDays.includes(day)) {
+        return prevDays.filter((d) => d !== day);
+      } else {
+        return [...prevDays, day];
+      }
+    });
   };
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -96,22 +109,22 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
             </div>
           )}
 
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="day" className="text-right">
-              Day
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="day" className="text-right mt-1">
+              Days
             </Label>
-            <Select value={day} onValueChange={setDay} className="col-span-3">
-              <SelectTrigger id="day">
-                <SelectValue placeholder="Select a day" />
-              </SelectTrigger>
-              <SelectContent>
-                {daysOfWeek.map((day) => (
-                  <SelectItem key={day} value={day}>
-                    {day}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="col-span-3 flex flex-col">
+              {daysOfWeek.map((day) => (
+                <div key={day} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={day}
+                    checked={days.includes(day)}
+                    onCheckedChange={() => handleDayChange(day)}
+                  />
+                  <Label htmlFor={day}>{day}</Label>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">

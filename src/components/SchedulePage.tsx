@@ -71,6 +71,20 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+  // Group schedules by day and time
+  const groupedSchedules = daysOfWeek.map(day => {
+    const schedulesForDay = schedules.filter(schedule => schedule.day === day);
+    const times = Array.from(new Set(schedulesForDay.map(schedule => schedule.time))); // Unique times
+    return {
+      day,
+      times: times.map(time => ({
+        time,
+        supplements: schedulesForDay.filter(schedule => schedule.time === time)
+                                    .map(schedule => schedule.supplement)
+      }))
+    };
+  });
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
@@ -86,19 +100,17 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {daysOfWeek.map((day) => (
+        {groupedSchedules.map(({day, times}) => (
           <Card key={day}>
             <CardHeader>
               <CardTitle>{day}</CardTitle>
             </CardHeader>
             <CardContent>
-              {schedules
-                .filter((schedule) => schedule.day === day)
-                .map((schedule) => (
-                  <div key={schedule.id} className="mb-2 p-2 rounded-md bg-secondary">
-                    {schedule.supplement} - {schedule.time}
-                  </div>
-                ))}
+              {times.map(({time, supplements}) => (
+                <div key={`${day}-${time}`} className="mb-2 p-2 rounded-md bg-secondary">
+                  {supplements.join(', ')} - {time}
+                </div>
+              ))}
             </CardContent>
           </Card>
         ))}
