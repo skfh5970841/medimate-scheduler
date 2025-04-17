@@ -42,6 +42,29 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
           if (!localStorage.getItem(notificationKey)) {
             alert(`영양제 섭취 시간입니다. 섭취해야할 영양제 종류 : ${schedule.supplement}`);
             localStorage.setItem(notificationKey, 'true'); // Set flag in local storage
+
+            // Trigger Arduino API
+            fetch('/api/arduino', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({supplement: schedule.supplement}),
+            })
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                console.log('Arduino triggered successfully');
+              })
+              .catch(error => {
+                console.error('Failed to trigger Arduino:', error);
+                toast({
+                  title: 'Error',
+                  description: 'Failed to trigger Arduino. Please check the connection.',
+                  variant: 'destructive',
+                });
+              });
           }
         }
       });
