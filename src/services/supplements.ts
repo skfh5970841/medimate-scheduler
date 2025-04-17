@@ -20,18 +20,5 @@ export interface Supplement {
 export async function getSupplements(): Promise<Supplement[]> {
   // TODO: Implement this by calling an API.
 
-  return [
-    {
-      id: 'vitamin-d',
-      name: 'Vitamin D',
-    },
-    {
-      id: 'vitamin-c',
-      name: 'Vitamin C',
-    },
-    {
-      id: 'calcium',
-      name: 'Calcium',
-    },
-  ];
+  return [];
 }

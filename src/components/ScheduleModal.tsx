@@ -6,7 +6,7 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {Button} from '@/components/ui/button';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
-import {getSupplements, Supplement} from '@/services/supplements';
+import {Supplement} from '@/services/supplements';
 import {Schedule} from '@/types';
 import {Checkbox} from '@/components/ui/checkbox';
 
@@ -26,19 +26,51 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
   useEffect(() => {
     const fetchSupplements = async () => {
       try {
-        const supplements = await getSupplements();
-        setSupplementsList(supplements);
+        // Retrieve supplements from local storage
+        const storedSupplements = localStorage.getItem('supplements');
+        if (storedSupplements) {
+          setSupplementsList(JSON.parse(storedSupplements));
+        } else {
+          // Initialize with default supplements if none exist in local storage
+          setSupplementsList([
+            {id: 'vitamin-d', name: 'Vitamin D'},
+            {id: 'vitamin-c', name: 'Vitamin C'},
+            {id: 'calcium', name: 'Calcium'},
+          ]);
+        }
       } catch (error) {
-        console.error('Failed to fetch supplements:', error);
+        console.error('Failed to fetch supplements from local storage:', error);
+        // Fallback to default supplements in case of an error
+        setSupplementsList([
+          {id: 'vitamin-d', name: 'Vitamin D'},
+          {id: 'vitamin-c', name: 'Vitamin C'},
+          {id: 'calcium', name: 'Calcium'},
+        ]);
       }
     };
 
     fetchSupplements();
   }, []);
 
+  useEffect(() => {
+    // Persist supplements to local storage whenever the list changes
+    localStorage.setItem('supplements', JSON.stringify(supplementsList));
+  }, [supplementsList]);
+
+
   const handleSubmit = () => {
     if ((supplement !== 'newSupplement' ? supplement : newSupplement) && days.length > 0 && time) {
       const finalSupplement = supplement === 'newSupplement' ? newSupplement : supplement;
+
+      if (supplement === 'newSupplement' && newSupplement) {
+        // Add the new supplement to the list
+        const newSupplementObject: Supplement = {
+          id: newSupplement.toLowerCase().replace(/\s+/g, '-'), // Generate a unique ID
+          name: newSupplement,
+        };
+        setSupplementsList(prevList => [...prevList, newSupplementObject]);
+        setSupplement(newSupplement); // set the selected supplement as the new one
+      }
 
       days.forEach((day) => {
         const newSchedule: Schedule = {
