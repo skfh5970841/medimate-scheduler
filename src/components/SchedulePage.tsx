@@ -12,6 +12,18 @@ interface SchedulePageProps {
   onLogout: () => void;
 }
 
+// Function to compare two time strings
+const compareTimes = (timeA: string, timeB: string): number => {
+  const [hoursA, minutesA] = timeA.split(':').map(Number);
+  const [hoursB, minutesB] = timeB.split(':').map(Number);
+
+  if (hoursA !== hoursB) {
+    return hoursA - hoursB;
+  }
+
+  return minutesA - minutesB;
+};
+
 export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -158,7 +170,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
   // Group schedules by day and time
   const groupedSchedules = daysOfWeek.map(day => {
     const schedulesForDay = schedules.filter(schedule => schedule.day === day);
-    const times = Array.from(new Set(schedulesForDay.map(schedule => schedule.time))); // Unique times
+    let times = Array.from(new Set(schedulesForDay.map(schedule => schedule.time))); // Unique times
+	times.sort(compareTimes);
     return {
       day,
       times: times.map(time => ({
