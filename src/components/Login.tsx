@@ -4,6 +4,8 @@ import React, {useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import { registerUser, readUsers } from '@/lib/user-actions'; // Import server actions
+
 
 interface LoginProps {
   onLogin: () => void;
@@ -15,18 +17,23 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [registeredUsers, setRegisteredUsers] = useState<{username: string; password: string}[]>([]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null); // Clear any previous errors
 
-    const user = registeredUsers.find((u) => u.username === username && u.password === password);
+    const users = await readUsers();
+
+    const user = users.find((u) => u.username === username && u.password === password);
 
     if (user) {
       onLogin();
-    } else if (username === 'root' && password === '1234') {
-      // Default login
+    }
+    
+    else if (users.length === 0 && username === '' && password === '') {
+      setError('Please register.');
+    }
+     else if (users.length === 0 && (username !== '' || password !== '')) {
       onLogin();
     } else {
       setError('Invalid credentials');
@@ -42,15 +49,23 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
       return;
     }
 
-    if (registeredUsers.some((u) => u.username === username)) {
+    const users = await readUsers();
+    if (users.some((u) => u.username === username)) {
       setError('Username already exists.');
       return;
     }
 
-    // Update registered users
-    setRegisteredUsers([...registeredUsers, {username, password}]);
-    setIsRegistering(false); // Switch back to login
-    alert('Registration successful. Please log in.');
+    try {
+        await registerUser(username, password);
+        setIsRegistering(false); // Switch back to login
+        alert('Registration successful. Please login.');
+
+    } catch (err: any) {
+        console.error('Registration failed:', err);
+        setError('Registration failed. Please try again.');
+    }
+
+    
   };
 
   const toggleForm = () => {
@@ -124,3 +139,4 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
     </Card>
   );
 };
+
