@@ -24,9 +24,22 @@ async function writeSchedules(schedules: Schedule[]): Promise<void> {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const schedules = await readSchedules();
+    const {searchParams} = new URL(request.url);
+    const lastUpdated = searchParams.get('lastUpdated');
+
+    let schedules = await readSchedules();
+
+    if (lastUpdated) {
+      const lastUpdatedTime = new Date(lastUpdated).getTime();
+      schedules = schedules.filter(schedule => {
+        // Assuming schedule.id contains a timestamp part (e.g., "1744943954408-Monday")
+        const scheduleTimestamp = new Date(parseInt(schedule.id.split('-')[0])).getTime();
+        return scheduleTimestamp > lastUpdatedTime;
+      });
+    }
+
     return NextResponse.json(schedules);
   } catch (error: any) {
     console.error('GET Error:', error);
