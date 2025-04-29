@@ -6,7 +6,7 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {ScheduleModal} from '@/components/ScheduleModal';
 import {Schedule} from '@/types';
 import {toast} from '@/hooks/use-toast';
-import {Trash2} from 'lucide-react';
+import {Trash2, Lightbulb, LightbulbOff} from 'lucide-react'; // Import LED icons
 
 interface SchedulePageProps {
   onLogout: () => void;
@@ -28,9 +28,11 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [username, setUsername] = useState<string>('');
+  const [ledStatus, setLedStatus] = useState<'on' | 'off' | 'unknown'>('unknown'); // Optional: Track LED status for UI feedback
 
   useEffect(() => {
     fetchSchedules();
+    // You might want to fetch the initial LED status here if the ESP32 provides an endpoint for it.
   }, []);
 
   useEffect(() => {
@@ -55,8 +57,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
             alert(`영양제 섭취 시간입니다. 섭취해야할 영양제 종류 : ${schedule.supplement}`);
             localStorage.setItem(notificationKey, 'true'); // Set flag in local storage
 
-            // Trigger Arduino API
-            fetch('/api/arduino', {
+            // Trigger Arduino/ESP32 API for supplement dispensing
+            fetch('/api/arduino', { // Keep existing API for dispensing
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -67,13 +69,13 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
                 if (!response.ok) {
                   throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                console.log('Arduino triggered successfully');
+                console.log('Arduino/ESP32 dispenser triggered successfully');
               })
               .catch(error => {
-                console.error('Failed to trigger Arduino:', error);
+                console.error('Failed to trigger Arduino/ESP32 dispenser:', error);
                 toast({
                   title: 'Error',
-                  description: 'Failed to trigger Arduino. Please check the connection.',
+                  description: 'Failed to trigger dispenser. Please check the connection.',
                   variant: 'destructive',
                 });
               });
@@ -161,6 +163,42 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     }
   };
 
+  // --- LED Control ---
+  const controlLed = async (state: 'on' | 'off') => {
+    setLedStatus('unknown'); // Indicate loading/sending state
+    try {
+      const response = await fetch('/api/esp32/led', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ state }),
+      });
+
+      if (!response.ok) {
+         const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+        throw new Error(`HTTP error! status: ${response.status} - ${errorData.message || 'Unknown error'}`);
+      }
+
+      const result = await response.json();
+      setLedStatus(state); // Update UI status on success
+      toast({
+        title: 'Success',
+        description: result.message || `LED turned ${state}`,
+      });
+    } catch (error: any) {
+        console.error(`Failed to turn LED ${state}:`, error);
+        toast({
+          title: 'Error',
+          description: error.message || `Failed to turn LED ${state}. Check ESP32 connection.`,
+          variant: 'destructive',
+        });
+        // Optionally revert status or keep it unknown
+        // setLedStatus(ledStatus === 'on' ? 'off' : 'on'); // Revert if needed
+    }
+  };
+  // --- End LED Control ---
+
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
@@ -197,16 +235,24 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
        <div>
-            {username && <span className="mr-4">Logged in as: {username}</span>}
+            {username && <span className="mr-4 text-sm text-muted-foreground">Logged in as: {username}</span>}
           </div>
-        <div>
+        <div className="text-center">
           <h1 className="text-2xl font-bold">Weekly Schedule</h1>
           <p className="text-muted-foreground">
             {currentDate}, {currentDay}
           </p>
         </div>
-        <div>
-          <Button onClick={openModal} className="mr-2">
+        <div className="flex items-center space-x-2">
+           {/* LED Control Buttons */}
+           <Button onClick={() => controlLed('on')} variant="outline" size="icon" title="Turn LED On" disabled={ledStatus === 'on'}>
+             <Lightbulb className="h-5 w-5" />
+           </Button>
+           <Button onClick={() => controlLed('off')} variant="outline" size="icon" title="Turn LED Off" disabled={ledStatus === 'off'}>
+             <LightbulbOff className="h-5 w-5" />
+           </Button>
+           {/* End LED Control Buttons */}
+          <Button onClick={openModal}>
             Add Schedule
           </Button>
           <Button variant="outline" onClick={onLogout}>
@@ -217,28 +263,31 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {groupedSchedules.map(({day, times}) => (
-          <Card key={day}>
+          <Card key={day} className={`${day === currentDay ? 'border-primary' : ''}`}>
             <CardHeader>
               <CardTitle>{day}</CardTitle>
             </CardHeader>
             <CardContent>
+             {times.length === 0 && <p className="text-sm text-muted-foreground">No schedules</p>}
               {times.map(({time, supplements}) => (
-                <div key={`${day}-${time}`} className="mb-2 p-2 rounded-md bg-secondary flex flex-col">
-                  <span>
-                    {supplements.map((s, index) => (
-                      <div key={s.id} className="flex items-center justify-between">
+                <div key={`${day}-${time}`} className="mb-3 p-3 rounded-md bg-secondary border border-border">
+                  <p className="font-semibold mb-1">{time}</p>
+                  <div className="flex flex-col space-y-1">
+                    {supplements.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between text-sm">
                         <span>{s.supplement}</span>
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
                           onClick={() => deleteSchedule(s.id)}
+                          title={`Delete ${s.supplement} at ${time}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
-                    <span className="block"> - {time}</span>
-                  </span>
+                  </div>
                 </div>
               ))}
             </CardContent>
