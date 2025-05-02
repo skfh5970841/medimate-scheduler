@@ -27,6 +27,7 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
     const user = users.find((u) => u.username === username && u.password === password);
 
     if (user) {
+      localStorage.setItem('username', username); // 여기!
       onLogin();
     }
 

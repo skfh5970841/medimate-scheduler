@@ -256,7 +256,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6 border-b pb-4">
        <div className="text-sm text-muted-foreground">
-            {username ? `로그인된 사용자: ${username}` : '로그인되지 않음'}
+            {username ? `Loged in: ${username}` : 'none Log in'}
        </div>
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-1">주간 영양제 스케줄</h1>
