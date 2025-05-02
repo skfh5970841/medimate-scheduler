@@ -40,24 +40,53 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [username, setUsername] = useState<string>('');
   const [ledStatus, setLedStatus] = useState<'on' | 'off' | 'unknown'>('unknown'); // Track LED status
+  const [isLedLoading, setIsLedLoading] = useState<boolean>(false); // Track loading state for LED buttons
+
+  // Function to fetch the current LED status from the backend
+  const fetchLedStatus = async () => {
+    try {
+      // We assume the GET route now just returns the *desired* state
+      // as set by the POST route. The actual ESP32 state isn't directly known here.
+      // A more robust solution might involve the ESP32 reporting its actual state
+      // back to a different endpoint, which the frontend could then query.
+      // For now, we optimistically assume the last command sent will be the state.
+      // Let's initialize based on what the GET returns (the last set command).
+      setIsLedLoading(true);
+      const response = await fetch('/api/esp32/led'); // GET request
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      if (data.state === 'on' || data.state === 'off') {
+        setLedStatus(data.state);
+      } else {
+        setLedStatus('unknown'); // Fallback if state is invalid
+      }
+    } catch (error) {
+      console.error('Failed to fetch initial LED status:', error);
+      setLedStatus('unknown'); // Set to unknown on error
+      // toast({
+      //   title: 'LED 상태 오류',
+      //   description: '초기 LED 상태를 가져오는데 실패했습니다.',
+      //   variant: 'destructive',
+      // });
+    } finally {
+        setIsLedLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     fetchSchedules();
-    // Fetch initial LED status if available
-    // Example: fetch('/api/esp32/led/status').then(...).then(status => setLedStatus(status));
-  }, []);
-
-  useEffect(() => {
+    fetchLedStatus(); // Fetch initial LED status when component mounts
     // Retrieve username from localStorage
     const storedUsername = localStorage.getItem('username');
     if (storedUsername) {
       setUsername(storedUsername);
     } else {
-      // Fallback or redirect if username isn't set (might indicate not logged in properly)
       console.warn("Username not found in localStorage.");
-      // onLogout(); // Consider logging out if username is crucial and missing
     }
-  }, [onLogout]); // Add onLogout to dependency array if used inside effect
+  }, []); // Run only once on mount
 
   useEffect(() => {
     const checkSchedules = () => {
@@ -180,9 +209,12 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
 
   // --- LED Control ---
   const controlLed = async (state: 'on' | 'off') => {
-    setLedStatus('unknown'); // Indicate loading/sending state
+    const previousStatus = ledStatus; // Store previous status for potential revert
+    setIsLedLoading(true);
+    setLedStatus(state); // Optimistic UI update
+
     try {
-      const response = await fetch('/api/esp32/led', {
+      const response = await fetch('/api/esp32/led', { // Correctly calls the POST endpoint
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -196,20 +228,21 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
         throw new Error(result.message || `HTTP error! status: ${response.status}`);
       }
 
-      setLedStatus(state); // Update UI status on success
+      // On success, the optimistic update is kept.
       toast({
-        title: '성공',
-        description: result.message || `LED가 ${state === 'on' ? '켜졌습니다' : '꺼졌습니다'}`,
+        title: '명령 전송 성공',
+        description: `LED ${state === 'on' ? '켜기' : '끄기'} 명령이 ESP32로 전송되었습니다.`,
       });
     } catch (error: any) {
-        console.error(`Failed to turn LED ${state}:`, error);
+        console.error(`Failed to send LED ${state} command:`, error);
+        setLedStatus(previousStatus); // Revert optimistic update on failure
         toast({
-          title: '오류',
-          description: error.message || `LED ${state === 'on' ? '켜기' : '끄기'} 실패. ESP32 연결을 확인하세요.`,
+          title: '명령 전송 오류',
+          description: error.message || `LED ${state === 'on' ? '켜기' : '끄기'} 명령 전송 실패. ESP32 연결 또는 API 상태를 확인하세요.`,
           variant: 'destructive',
         });
-        // Optionally revert status or keep it unknown
-        // setLedStatus(prevState => prevState === 'unknown' ? 'unknown' : (prevState === 'on' ? 'off' : 'on'));
+    } finally {
+        setIsLedLoading(false);
     }
   };
   // --- End LED Control ---
@@ -256,7 +289,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6 border-b pb-4">
        <div className="text-sm text-muted-foreground">
-            {username ? `Loged in: ${username}` : 'none Log in'}
+            {username ? `로그인 사용자: ${username}` : '로그인되지 않음'}
        </div>
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-1">주간 영양제 스케줄</h1>
@@ -266,10 +299,10 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
         </div>
         <div className="flex items-center space-x-2">
            {/* LED Control Buttons */}
-           <Button onClick={() => controlLed('on')} variant={ledStatus === 'on' ? "default" : "outline"} size="icon" title="LED 켜기" disabled={ledStatus === 'on'}>
+           <Button onClick={() => controlLed('on')} variant={ledStatus === 'on' ? "default" : "outline"} size="icon" title="LED 켜기 명령" disabled={isLedLoading || ledStatus === 'on'}>
              <Lightbulb className="h-5 w-5" />
            </Button>
-           <Button onClick={() => controlLed('off')} variant={ledStatus === 'off' ? "default" : "outline"} size="icon" title="LED 끄기" disabled={ledStatus === 'off'}>
+           <Button onClick={() => controlLed('off')} variant={ledStatus === 'off' ? "default" : "outline"} size="icon" title="LED 끄기 명령" disabled={isLedLoading || ledStatus === 'off'}>
              <LightbulbOff className="h-5 w-5" />
            </Button>
            {/* End LED Control Buttons */}
@@ -321,3 +354,4 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     </div>
   );
 };
+

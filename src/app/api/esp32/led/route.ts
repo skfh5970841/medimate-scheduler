@@ -1,65 +1,54 @@
-import {NextResponse} from 'next/server';
+// 파일 경로: src/app/api/esp32/led/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { getLedState, setLedState } from '@/lib/ledState'; // 상태 관리 유틸리티 import (경로 수정)
 
-// IMPORTANT: Replace with the actual IP address or hostname of your ESP32
-const ESP32_IP_ADDRESS = process.env.ESP32_IP_ADDRESS || 'http://192.168.1.100'; // Default to a common local IP, use environment variable
-
-export async function POST(request: Request) {
+// GET: ESP32가 이 경로로 폴링하여 최신 LED 상태 명령을 가져갑니다.
+export async function GET(request: NextRequest) {
   try {
-    const { state } = await request.json(); // Expecting { "state": "on" | "off" }
+    // (선택 사항) ESP32가 자신의 상태를 쿼리 파라미터로 보냈는지 확인
+    const espReportedState = request.nextUrl.searchParams.get('currentState');
+    if (espReportedState) {
+      console.log(`[API /api/esp32/led GET] ESP32 reported state: ${espReportedState}`);
+      // 이 정보를 로깅하거나 다른 용도로 활용 가능
+    }
 
-    if (state !== 'on' && state !== 'off') {
+    // 저장된 최신 LED 상태 명령 가져오기
+    const commandToSend = await getLedState(); // 저장된 상태 읽기
+
+    console.log(`[API /api/esp32/led GET] Sending command to ESP32: ${commandToSend}`);
+
+    // ESP32가 파싱할 JSON 형식으로 응답 ('state' 키 사용)
+    return NextResponse.json({ state: commandToSend }, { status: 200 });
+
+  } catch (error) {
+    console.error('[API /api/esp32/led GET] Error getting command for ESP32:', error);
+    // ESP32는 복잡한 에러 메시지를 처리하기 어려울 수 있으므로 간단한 응답 고려
+    return NextResponse.json({ error: 'Error getting command' }, { status: 500 });
+  }
+}
+
+// POST: 웹 UI가 이 경로로 요청하여 LED 상태 변경을 명령합니다.
+export async function POST(request: NextRequest) {
+  try {
+    // 요청 본문에서 'state' 값 ( 'on' 또는 'off' ) 추출
+    const body = await request.json();
+    const newState = body.state;
+
+    // 유효한 상태 값인지 확인
+    if (newState !== 'on' && newState !== 'off') {
+      console.log(`[API /api/esp32/led POST] Invalid state received: ${newState}`);
       return NextResponse.json({ message: 'Invalid state. Must be "on" or "off".' }, { status: 400 });
     }
 
-    console.log(`Forwarding LED control request to ESP32: ${state.toUpperCase()}`);
+    // 새로운 LED 상태 저장
+    await setLedState(newState);
+    console.log(`[API /api/esp32/led POST] Set LED state command to: ${newState}`);
 
-    // --- Communicate with ESP32 ---
-    // Adjust the endpoint and method based on your ESP32's API design.
-    // Example: ESP32 has an endpoint `/led` that accepts POST requests
-    const esp32Endpoint = `${ESP32_IP_ADDRESS}/led`;
+    // 성공 응답 반환
+    return NextResponse.json({ message: `LED state command set to ${newState}` }, { status: 200 });
 
-    const espResponse = await fetch(esp32Endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ state }), // Send the state to the ESP32
-      // Add a timeout to prevent hanging requests
-      signal: AbortSignal.timeout(5000) // 5 seconds timeout
-    });
-
-    if (!espResponse.ok) {
-        // Try to get more specific error from ESP32 response
-        const espErrorText = await espResponse.text().catch(() => 'Could not read ESP32 error response');
-        console.error(`ESP32 responded with status ${espResponse.status}: ${espErrorText}`);
-        throw new Error(`ESP32 control failed with status ${espResponse.status}. ${espErrorText}`);
-    }
-
-    // Optionally process the ESP32's response if it sends one
-    // const espResult = await espResponse.json();
-    // console.log("ESP32 Response:", espResult);
-
-
-    return NextResponse.json({ message: `LED successfully turned ${state}` }, { status: 200 });
-
-  } catch (error: any) {
-    console.error('Error controlling ESP32 LED:', error);
-
-    let errorMessage = 'Internal Server Error';
-    let statusCode = 500;
-
-    if (error.name === 'AbortError') {
-        errorMessage = 'Request to ESP32 timed out.';
-        statusCode = 504; // Gateway Timeout
-    } else if (error.message?.includes('fetch failed') || error.code === 'ECONNREFUSED') {
-         errorMessage = 'Could not connect to ESP32. Is it online and reachable?';
-         statusCode = 502; // Bad Gateway
-    } else if (error.message?.includes('ESP32 control failed')) {
-        errorMessage = error.message; // Use the specific error from ESP32 response
-        statusCode = 502; // Bad Gateway or specific status if parsed
-    }
-
-
-    return NextResponse.json({ message: errorMessage }, { status: statusCode });
+  } catch (error) {
+    console.error('[API /api/esp32/led POST] Error setting LED state command:', error);
+    return NextResponse.json({ message: 'Error setting LED state command' }, { status: 500 });
   }
 }

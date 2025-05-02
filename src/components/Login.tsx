@@ -36,6 +36,7 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
     }
      else if (users.length === 0 && (username !== '' || password !== '')) {
        // First user login scenario (treat as valid if no users exist)
+       localStorage.setItem('username', username);
       onLogin();
     } else {
       setError('아이디 또는 비밀번호가 잘못되었습니다.');
