@@ -84,7 +84,7 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
         <CardDescription>
           {isRegistering
             ? '계정을 생성하여 스케줄을 관리하세요.'
-            : '아이디와 비밀번호를 입력하여 스케줄에 접근하세요.'}
+            : ''}
         </CardDescription>
       </CardHeader>
       <CardContent>
