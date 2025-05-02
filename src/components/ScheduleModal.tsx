@@ -33,18 +33,18 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
         } else {
           // Initialize with default supplements if none exist in local storage
           setSupplementsList([
-            {id: 'vitamin-d', name: 'Vitamin D'},
-            {id: 'vitamin-c', name: 'Vitamin C'},
-            {id: 'calcium', name: 'Calcium'},
+            {id: 'vitamin-d', name: '비타민 D'},
+            {id: 'vitamin-c', name: '비타민 C'},
+            {id: 'calcium', name: '칼슘'},
           ]);
         }
       } catch (error) {
         console.error('Failed to fetch supplements from local storage:', error);
         // Fallback to default supplements in case of an error
         setSupplementsList([
-          {id: 'vitamin-d', name: 'Vitamin D'},
-          {id: 'vitamin-c', name: 'Vitamin C'},
-          {id: 'calcium', name: 'Calcium'},
+            {id: 'vitamin-d', name: '비타민 D'},
+            {id: 'vitamin-c', name: '비타민 C'},
+            {id: 'calcium', name: '칼슘'},
         ]);
       }
     };
@@ -54,37 +54,73 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
 
   useEffect(() => {
     // Persist supplements to local storage whenever the list changes
-    localStorage.setItem('supplements', JSON.stringify(supplementsList));
+    // Only write if the list is not empty, to avoid overwriting initial defaults with empty array on first load
+    if (supplementsList.length > 0) {
+        localStorage.setItem('supplements', JSON.stringify(supplementsList));
+    }
   }, [supplementsList]);
 
 
   const handleSubmit = () => {
-    if ((supplement !== 'newSupplement' ? supplement : newSupplement) && days.length > 0 && time) {
-      const finalSupplement = supplement === 'newSupplement' ? newSupplement : supplement;
+    const selectedSupplementName = supplement === 'newSupplement' ? newSupplement.trim() : supplement;
 
-      if (supplement === 'newSupplement' && newSupplement) {
-        // Add the new supplement to the list
-        const newSupplementObject: Supplement = {
-          id: newSupplement.toLowerCase().replace(/\s+/g, '-'), // Generate a unique ID
-          name: newSupplement,
-        };
-        setSupplementsList(prevList => [...prevList, newSupplementObject]);
-        setSupplement(newSupplement); // set the selected supplement as the new one
-      }
-
-      days.forEach((day) => {
-        const newSchedule: Schedule = {
-          id: Date.now().toString() + '-' + day, // Generate a unique ID including the day
-          supplement: finalSupplement,
-          day,
-          time,
-        };
-        onAddSchedule(newSchedule);
-      });
-      onClose();
-    } else {
-      alert('Please fill in all fields.');
+    if (!selectedSupplementName) {
+      alert('영양제를 선택하거나 입력해주세요.');
+      return;
     }
+     if (days.length === 0) {
+      alert('요일을 선택해주세요.');
+      return;
+    }
+     if (!time) {
+      alert('시간을 선택해주세요.');
+      return;
+    }
+
+    // If 'New Supplement' was selected and a name was entered
+    if (supplement === 'newSupplement' && newSupplement) {
+      const trimmedNewSupplement = newSupplement.trim();
+      const newId = trimmedNewSupplement.toLowerCase().replace(/\s+/g, '-');
+
+      // Check if supplement with the same name or ID already exists (case-insensitive check for name)
+      if (!supplementsList.some(s => s.id === newId || s.name.toLowerCase() === trimmedNewSupplement.toLowerCase())) {
+        const newSupplementObject: Supplement = {
+          id: newId, // Generate a unique ID
+          name: trimmedNewSupplement,
+        };
+        // Use functional update to ensure we have the latest list state
+        setSupplementsList(prevList => [...prevList, newSupplementObject]);
+        // No need to setSupplement here, finalSupplement handles it
+      } else {
+          // If it already exists, use the existing one
+          const existingSupplement = supplementsList.find(s => s.id === newId || s.name.toLowerCase() === trimmedNewSupplement.toLowerCase());
+          if(existingSupplement) {
+              // Optional: alert user that the supplement already exists
+              // alert(`영양제 '${existingSupplement.name}'는 이미 존재합니다.`);
+              // Use the existing supplement name for the schedule
+              // setSupplement(existingSupplement.name); // This would switch the select dropdown
+          }
+      }
+    }
+
+    // Add the schedule(s)
+    days.forEach((day) => {
+      const newSchedule: Schedule = {
+        id: Date.now().toString() + '-' + day + '-' + selectedSupplementName.replace(/\s+/g, '-'), // More unique ID
+        supplement: selectedSupplementName,
+        day,
+        time,
+      };
+      onAddSchedule(newSchedule);
+    });
+
+    // Reset form fields and close modal
+    setSupplement('');
+    setNewSupplement('');
+    setDays([]);
+    setTime('');
+    onClose();
+
   };
 
   const handleDayChange = (day: string) => {
@@ -97,30 +133,40 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
     });
   };
 
-  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  // Korean day names map
+  const daysOfWeekMap: {[key: string]: string} = {
+      'Monday': '월요일',
+      'Tuesday': '화요일',
+      'Wednesday': '수요일',
+      'Thursday': '목요일',
+      'Friday': '금요일',
+      'Saturday': '토요일',
+      'Sunday': '일요일'
+  };
+  const daysOfWeek = Object.keys(daysOfWeekMap); // Use English keys for internal logic
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Schedule</DialogTitle>
+          <DialogTitle>스케줄 추가</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="supplement" className="text-right">
-              Supplement
+              영양제
             </Label>
-            <Select value={supplement} onValueChange={setSupplement} className="col-span-3">
-              <SelectTrigger id="supplement">
-                <SelectValue placeholder="Select a supplement" />
+            <Select value={supplement} onValueChange={setSupplement} >
+              <SelectTrigger id="supplement" className="col-span-3">
+                <SelectValue placeholder="영양제 선택" />
               </SelectTrigger>
               <SelectContent>
-                {supplementsList.map((supplement) => (
-                  <SelectItem key={supplement.id} value={supplement.name}>
-                    {supplement.name}
+                {supplementsList.map((s) => (
+                  <SelectItem key={s.id} value={s.name}> {/* Use name as value for consistency */}
+                    {s.name}
                   </SelectItem>
                 ))}
-                <SelectItem value="newSupplement">New Supplement</SelectItem>
+                <SelectItem value="newSupplement">새 영양제 추가</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -128,12 +174,12 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
           {supplement === 'newSupplement' && (
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="newSupplement" className="text-right">
-                New Supplement
+                새 영양제 이름
               </Label>
               <Input
                 type="text"
                 id="newSupplement"
-                placeholder="Enter new supplement"
+                placeholder="새 영양제 이름 입력"
                 value={newSupplement}
                 onChange={(e) => setNewSupplement(e.target.value)}
                 className="col-span-3"
@@ -143,9 +189,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
 
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="day" className="text-right mt-1">
-              Days
+              요일
             </Label>
-            <div className="col-span-3 flex flex-col">
+            <div className="col-span-3 grid grid-cols-2 gap-x-4 gap-y-2"> {/* Use grid for better layout */}
               {daysOfWeek.map((day) => (
                 <div key={day} className="flex items-center space-x-2">
                   <Checkbox
@@ -153,7 +199,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
                     checked={days.includes(day)}
                     onCheckedChange={() => handleDayChange(day)}
                   />
-                  <Label htmlFor={day}>{day}</Label>
+                  {/* Display Korean day name */}
+                  <Label htmlFor={day} className="font-normal">{daysOfWeekMap[day]}</Label>
                 </div>
               ))}
             </div>
@@ -161,7 +208,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="time" className="text-right">
-              Time
+              시간
             </Label>
             <Input
               type="time"
@@ -173,8 +220,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
           </div>
         </div>
         <DialogFooter>
+           <Button variant="outline" onClick={onClose}>취소</Button> {/* Add Cancel button */}
           <Button type="submit" onClick={handleSubmit}>
-            Add Schedule
+            스케줄 추가
           </Button>
         </DialogFooter>
       </DialogContent>
