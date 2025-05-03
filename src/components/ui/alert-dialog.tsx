@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -8,7 +9,7 @@ import { buttonVariants } from "@/components/ui/button"
 
 const AlertDialog = AlertDialogPrimitive.Root
 
-const AlertDialogTrigger = AlertDialogPrimitive.Trigger
+const AlertDialogTrigger = AlertDialogPrimitive.Trigger // Ensure this is exported
 
 const AlertDialogPortal = AlertDialogPrimitive.Portal
 
@@ -130,7 +131,7 @@ export {
   AlertDialog,
   AlertDialogPortal,
   AlertDialogOverlay,
-  AlertDialogTrigger,
+  AlertDialogTrigger, // Ensure AlertDialogTrigger is exported
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogFooter,

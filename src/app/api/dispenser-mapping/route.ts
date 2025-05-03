@@ -1,3 +1,4 @@
+
 import { NextResponse, NextRequest } from 'next/server'; // Import NextRequest
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -77,22 +78,27 @@ export async function DELETE(request: NextRequest) { // Use NextRequest here
     const { searchParams } = new URL(request.url);
     const supplementName = searchParams.get('supplementName'); // Get from query param
 
-    if (!supplementName) {
-        return new NextResponse('Missing supplementName query parameter', { status: 400 });
+    // If supplementName is provided, delete only that mapping
+    if (supplementName) {
+        const existingMapping = await readMapping();
+
+        if (!(supplementName in existingMapping)) {
+            return new NextResponse(`Mapping for '${supplementName}' not found`, { status: 404 });
+        }
+
+        delete existingMapping[supplementName]; // Delete the specific mapping
+        await writeMapping(existingMapping);
+
+        return NextResponse.json({ message: `Mapping for ${supplementName} deleted successfully` });
+    } else {
+        // If supplementName is NOT provided, reset all mappings (delete the file content)
+        await writeMapping({}); // Write an empty object to reset
+        return NextResponse.json({ message: `All mappings have been reset successfully` });
     }
 
-    const existingMapping = await readMapping();
-
-    if (!(supplementName in existingMapping)) {
-        return new NextResponse(`Mapping for '${supplementName}' not found`, { status: 404 });
-    }
-
-    delete existingMapping[supplementName]; // Delete the specific mapping
-    await writeMapping(existingMapping);
-
-    return NextResponse.json({ message: `Mapping for ${supplementName} deleted successfully` });
   } catch (error: any) {
     console.error('DELETE Error:', error);
-    return new NextResponse('Internal Server Error deleting mapping', { status: 500 });
+    return new NextResponse('Internal Server Error processing delete request', { status: 500 });
   }
 }
+```

@@ -23,6 +23,18 @@ import { toast } from "@/hooks/use-toast"; // Import toast for notifications
 import type { Supplement } from "@/services/supplements"; // Import Supplement type
 import { ScrollArea } from "@/components/ui/scroll-area"; // Import ScrollArea
 import { Separator } from "@/components/ui/separator"; // Import Separator
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 
 interface Mapping {
   [supplementName: string]: number;
@@ -40,6 +52,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
   const [selectedMotor, setSelectedMotor] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false); // Add loading state
   const [isDeleting, setIsDeleting] = useState(false); // Add deleting state
+  const [isResetting, setIsResetting] = useState(false); // Add resetting state
 
   const motorNumbers = [1, 2, 3, 4, 5, 6, 7, 8]; // Define motor numbers
 
@@ -250,6 +263,39 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
     }
   };
 
+  const handleResetMapping = async () => {
+    setIsResetting(true);
+    try {
+        const response = await fetch('/api/dispenser-mapping', {
+            method: 'DELETE', // Call DELETE without query param to reset all
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            throw new Error(errorData.message || "Failed to reset mapping");
+        }
+
+        toast({
+            title: '성공',
+            description: '모든 영양제 매핑이 초기화되었습니다.',
+        });
+        setCurrentMapping({}); // Clear local mapping state
+        setSelectedSupplement(""); // Clear selection
+        setSelectedMotor(""); // Clear motor selection
+
+    } catch (error: any) {
+        console.error("Error resetting mapping:", error);
+        toast({
+            title: '오류',
+            description: `매핑 초기화 실패: ${error.message}`,
+            variant: 'destructive',
+        });
+    } finally {
+        setIsResetting(false);
+    }
+ };
+
+
   // Get currently used motors for conflict indication (optional)
   const usedMotors = Object.values(currentMapping);
 
@@ -344,27 +390,56 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
             </Select>
           </div>
           {/* Buttons moved to DialogFooter */}
-           <DialogFooter className="pt-4">
-             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting || isDeleting}>
-               닫기 {/* Changed from 취소 */}
-             </Button>
-             <Button
-                type="button"
-                onClick={handleDelete}
-                variant="destructive"
-                // Disable if no supplement selected OR if the selected one has no mapping OR during actions
-                disabled={!selectedSupplement || !(selectedSupplement in currentMapping) || isSubmitting || isDeleting}
-              >
-                {isDeleting ? '삭제 중...' : '삭제'}
-              </Button>
-            <Button type="submit" disabled={!selectedSupplement || !selectedMotor || isSubmitting || isDeleting}>
-               {isSubmitting ? '저장 중...' : '저장'}
-            </Button>
+           <DialogFooter className="pt-4 sm:justify-between"> {/* Use sm:justify-between for better layout */}
+
+             {/* Left-aligned Reset Button in Footer */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                    type="button"
+                    variant="destructive"
+                    className="sm:mr-auto" // Push to the left on sm screens and up
+                    disabled={isSubmitting || isDeleting || isResetting || Object.keys(currentMapping).length === 0} // Disable if no mappings exist
+                    >
+                    {isResetting ? '초기화 중...' : '전체 초기화'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>매핑 초기화 확인</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    정말로 모든 영양제 모터 매핑을 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>취소</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleResetMapping} disabled={isResetting}>
+                     {isResetting ? '초기화 중...' : '초기화'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+             {/* Right-aligned Buttons */}
+            <div className="flex flex-col-reverse sm:flex-row sm:space-x-2 mt-2 sm:mt-0"> {/* Group right buttons */}
+                <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting || isDeleting || isResetting}>
+                    닫기
+                </Button>
+                <Button
+                    type="button"
+                    onClick={handleDelete}
+                    variant="destructive"
+                    disabled={!selectedSupplement || !(selectedSupplement in currentMapping) || isSubmitting || isDeleting || isResetting}
+                >
+                    {isDeleting ? '삭제 중...' : '선택 삭제'}
+                </Button>
+                <Button type="submit" disabled={!selectedSupplement || !selectedMotor || isSubmitting || isDeleting || isResetting}>
+                   {isSubmitting ? '저장 중...' : '저장'}
+                </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
-
-    
