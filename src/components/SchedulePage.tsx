@@ -113,7 +113,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
           } catch (e) { /* ignore */ }
           throw new Error(errorMsg);
        }
-       return await response.json();
+       const data = await response.json().catch(() => ({})); // Handle empty or invalid JSON
+       return typeof data === 'object' && data !== null ? data : {}; // Ensure it's an object
      } catch (error: any) {
        console.error("매핑 데이터 가져오기 오류:", error);
        toast({
@@ -238,21 +239,36 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     }
   };
 
-  const addSchedule = async (newScheduleData: Omit<Schedule, 'id' | 'timestamp'>) => {
-     const timestamp = Date.now(); // Get current timestamp
-     const scheduleWithTimestamp: Schedule = {
-         ...newScheduleData,
-         id: `${timestamp}-${newScheduleData.day}-${newScheduleData.supplement.replace(/\s+/g, '-')}-${Math.random().toString(36).substring(2, 7)}`, // More unique ID
-         timestamp,
-     };
+ const addSchedule = (newSchedule: Schedule) => {
+    // Update state optimistically before API call for better UX
+    setSchedules(prevSchedules => {
+        const updated = [...prevSchedules, newSchedule];
+        // Re-sort after adding
+        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        updated.sort((a, b) => {
+            const dayIndexA = dayOrder.indexOf(a.day);
+            const dayIndexB = dayOrder.indexOf(b.day);
+            if (dayIndexA !== dayIndexB) {
+                return dayIndexA - dayIndexB;
+            }
+            return compareTimes(a.time, b.time);
+       });
+        return updated;
+    });
 
+    // Make the API call to persist the change
+    addScheduleAPI(newSchedule);
+  };
+
+
+  const addScheduleAPI = async (newScheduleData: Schedule) => {
     try {
       const response = await fetch('/api/schedules', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(scheduleWithTimestamp), // Send full schedule object
+        body: JSON.stringify(newScheduleData), // Send full schedule object from modal submit
       });
 
       if (!response.ok) {
@@ -261,17 +277,23 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
             const errorData = await response.json();
             errorMsg = errorData.message || errorMsg;
         } catch (e) { /* ignore */ }
+         // If API fails, revert the optimistic update
+         setSchedules(prevSchedules => prevSchedules.filter(s => s.id !== newScheduleData.id));
         throw new Error(errorMsg);
       }
 
+      // API call succeeded, confirm with toast
       toast({
         title: '성공',
         description: '스케줄이 추가되었습니다.',
       });
-      fetchSchedules(); // Refresh list
-      closeScheduleModal(); // Close modal on success
+      // No need to fetchSchedules() here because of optimistic update
+      // fetchSchedules(); // Refresh list if not doing optimistic update
+      // closeScheduleModal(); // Closing is handled in the modal itself on successful submit
     } catch (error: any) {
       console.error('스케줄 추가 실패:', error);
+       // Ensure state is reverted if API call fails
+       setSchedules(prevSchedules => prevSchedules.filter(s => s.id !== newScheduleData.id));
       toast({
         title: '오류',
         description: `스케줄 추가 실패: ${error.message || '알 수 없는 오류'}`,
@@ -472,7 +494,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
                     <div className="flex flex-col space-y-1">
                         {supplements.map((s) => (
                         <div key={s.id} className="flex items-center justify-between text-sm p-1 rounded hover:bg-secondary/50 group/item"> {/* Use secondary/50, added group/item */}
-                            <span className="truncate pr-2 flex-grow">{s.supplement}</span> {/* Added flex-grow */}
+                            {/* Remove truncate, add min-w-0 to allow shrinking */}
+                            <span className="pr-2 flex-grow min-w-0 break-words">{s.supplement}</span>
                             {/* Delete Button */}
                             <Button
                                 variant="ghost"
@@ -512,3 +535,4 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     </div>
   );
 };
+
