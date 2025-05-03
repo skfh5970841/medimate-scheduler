@@ -22,6 +22,10 @@ async function readMapping(): Promise<Mapping> {
   await ensureDirectoryExists(); // Ensure directory exists before reading
   try {
     const fileContent = await fs.readFile(dataFilePath, 'utf8');
+    // Handle empty file case
+    if (!fileContent.trim()) {
+      return {};
+    }
     const mapping: Mapping = JSON.parse(fileContent);
     return mapping;
   } catch (error: any) {
@@ -49,7 +53,9 @@ export async function GET() {
     const mapping = await readMapping();
     return NextResponse.json(mapping);
   } catch (error: any) {
-    return new NextResponse('Internal Server Error reading mapping', { status: 500 });
+    console.error('GET Error reading mapping:', error);
+    // Return JSON error response
+    return NextResponse.json({ message: '매핑 정보 읽기 중 서버 오류 발생' }, { status: 500 });
   }
 }
 
@@ -57,8 +63,8 @@ export async function POST(request: Request) {
   try {
     const newMappingData = await request.json();
     // Validate incoming data - should be an object
-    if (typeof newMappingData !== 'object' || newMappingData === null) {
-        return new NextResponse('Invalid mapping data format', { status: 400 });
+    if (typeof newMappingData !== 'object' || newMappingData === null || Object.keys(newMappingData).length === 0) {
+        return NextResponse.json({ message: '유효하지 않은 매핑 데이터 형식입니다.' }, { status: 400 });
     }
 
     const existingMapping = await readMapping();
@@ -68,8 +74,9 @@ export async function POST(request: Request) {
     // Return the part that was just updated/added
     return NextResponse.json(newMappingData, { status: 201 });
   } catch (error: any) {
-    console.error('POST Error:', error);
-    return new NextResponse('Internal Server Error updating mapping', { status: 500 });
+    console.error('POST Error updating mapping:', error);
+    // Return JSON error response
+    return NextResponse.json({ message: '매핑 업데이트 중 서버 오류 발생' }, { status: 500 });
   }
 }
 
@@ -83,22 +90,22 @@ export async function DELETE(request: NextRequest) { // Use NextRequest here
         const existingMapping = await readMapping();
 
         if (!(supplementName in existingMapping)) {
-            return new NextResponse(`Mapping for '${supplementName}' not found`, { status: 404 });
+            return NextResponse.json({ message: `'${supplementName}'에 대한 매핑을 찾을 수 없습니다.` }, { status: 404 });
         }
 
         delete existingMapping[supplementName]; // Delete the specific mapping
         await writeMapping(existingMapping);
 
-        return NextResponse.json({ message: `Mapping for ${supplementName} deleted successfully` });
+        return NextResponse.json({ message: `'${supplementName}' 매핑이 성공적으로 삭제되었습니다.` });
     } else {
         // If supplementName is NOT provided, reset all mappings (delete the file content)
         await writeMapping({}); // Write an empty object to reset
-        return NextResponse.json({ message: `All mappings have been reset successfully` });
+        return NextResponse.json({ message: `모든 매핑이 성공적으로 초기화되었습니다.` });
     }
 
   } catch (error: any) {
-    console.error('DELETE Error:', error);
-    return new NextResponse('Internal Server Error processing delete request', { status: 500 });
+    console.error('DELETE Error processing mapping delete request:', error);
+    // Return JSON error response
+    return NextResponse.json({ message: '매핑 삭제 요청 처리 중 서버 오류 발생' }, { status: 500 });
   }
 }
-```

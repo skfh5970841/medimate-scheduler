@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, {useState, useEffect} from 'react';
@@ -56,7 +57,15 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       setIsLedLoading(true);
       const response = await fetch('/api/esp32/led'); // GET request
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Try to get error message from response if possible
+         let errorMsg = `HTTP 오류! 상태 코드: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMsg = errorData.message || errorMsg;
+          } catch (e) {
+            // Ignore if response is not JSON
+          }
+        throw new Error(errorMsg);
       }
       const data = await response.json();
       if (data.state === 'on' || data.state === 'off') {
@@ -64,12 +73,13 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       } else {
         setLedStatus('unknown'); // Fallback if state is invalid
       }
-    } catch (error) {
-      console.error('Failed to fetch initial LED status:', error);
+    } catch (error: any) {
+      console.error('초기 LED 상태 가져오기 실패:', error);
       setLedStatus('unknown'); // Set to unknown on error
+      // Optionally show a toast, but can be noisy if ESP32/API is often down
       // toast({
       //   title: 'LED 상태 오류',
-      //   description: '초기 LED 상태를 가져오는데 실패했습니다.',
+      //   description: `초기 LED 상태를 가져오는데 실패했습니다: ${error.message}`,
       //   variant: 'destructive',
       // });
     } finally {
@@ -87,15 +97,43 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       setUsername(storedUsername);
     } else {
       // Handle case where username might not be set (e.g., direct navigation)
-      console.warn("Username not found in localStorage.");
+      console.warn("사용자 이름을 localStorage에서 찾을 수 없습니다.");
     }
   }, []); // Run only once on mount
+
+   // Fetch mapping data (for dispense check)
+   const fetchMapping = async (): Promise<{ [key: string]: number }> => {
+     try {
+       const response = await fetch('/api/dispenser-mapping');
+       if (!response.ok) {
+          let errorMsg = '매핑 데이터 가져오기 실패';
+          try {
+            const errorData = await response.json();
+            errorMsg = errorData.message || errorMsg;
+          } catch (e) { /* ignore */ }
+          throw new Error(errorMsg);
+       }
+       return await response.json();
+     } catch (error: any) {
+       console.error("매핑 데이터 가져오기 오류:", error);
+       toast({
+           title: '매핑 오류',
+           description: `영양제 매핑 정보를 불러오는데 실패했습니다: ${error.message || '알 수 없는 오류'}`,
+           variant: 'destructive',
+         });
+       return {}; // Return empty mapping on error
+     }
+   };
+
 
   useEffect(() => {
     const checkSchedules = async () => { // Make async to potentially await API calls
       const now = new Date();
       const currentDay = now.toLocaleDateString('en-US', {weekday: 'long'}); // Use English for matching keys
       const currentTime = now.toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit'});
+
+      // Fetch mapping data once per check cycle if needed
+       let mappingData: { [key: string]: number } | null = null;
 
       for (const schedule of schedules) {
         if (schedule.day === currentDay && schedule.time === currentTime) {
@@ -109,18 +147,17 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
             });
             sessionStorage.setItem(notificationKey, 'true');
 
-            // --- API Call for Dispensing (Placeholder) ---
-            // This is where you'd call an API to trigger the ESP32 dispenser
-            console.log(`[Notification] Time to take ${schedule.supplement}. Triggering dispense API...`);
+            // --- API Call for Dispensing ---
+            console.log(`[알림] ${schedule.supplement} 섭취 시간입니다. 디스펜스 API 호출 중...`);
             try {
-                // Example: Fetch mapping to get motor number
-                const mappingResponse = await fetch('/api/dispenser-mapping');
-                if (!mappingResponse.ok) throw new Error('Failed to get mapping');
-                const mappingData = await mappingResponse.json();
+                // Fetch mapping data only when needed
+                if (mappingData === null) {
+                    mappingData = await fetchMapping();
+                }
                 const motorNumber = mappingData[schedule.supplement];
 
                 if (motorNumber) {
-                    console.log(`[Dispense] Mapped ${schedule.supplement} to motor ${motorNumber}. Sending command...`);
+                    console.log(`[디스펜스] ${schedule.supplement} -> 모터 ${motorNumber}. 명령 전송 중...`);
                     // TODO: Replace with your actual dispense API endpoint and payload
                     // const dispenseResponse = await fetch('/api/esp32/dispense', { // hypothetical endpoint
                     //   method: 'POST',
@@ -128,14 +165,14 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
                     //   body: JSON.stringify({ motor: motorNumber }),
                     // });
                     // if (!dispenseResponse.ok) {
-                    //     console.error(`[Dispense Error] Failed to dispense ${schedule.supplement} (Motor ${motorNumber})`);
+                    //     console.error(`[디스펜스 오류] ${schedule.supplement} (모터 ${motorNumber}) 디스펜스 실패`);
                     //     // Optionally show an error toast to the user
                     // } else {
-                    //     console.log(`[Dispense Success] Command sent for ${schedule.supplement} (Motor ${motorNumber})`);
+                    //     console.log(`[디스펜스 성공] ${schedule.supplement} (모터 ${motorNumber}) 명령 전송됨`);
                     //     // Optionally show a success toast
                     // }
                 } else {
-                    console.warn(`[Dispense Warning] No motor mapping found for supplement: ${schedule.supplement}. Cannot dispense.`);
+                    console.warn(`[디스펜스 경고] 영양제 ${schedule.supplement}에 대한 모터 매핑을 찾을 수 없습니다. 디스펜스 불가.`);
                      toast({
                          title: '매핑 오류',
                          description: `'${schedule.supplement}'에 대한 모터 매핑이 설정되지 않았습니다.`,
@@ -145,7 +182,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
                 }
 
             } catch (error) {
-                console.error('[Dispense API Error] Failed to trigger dispense:', error);
+                console.error('[디스펜스 API 오류] 디스펜스 트리거 실패:', error);
                  toast({
                      title: '디스펜스 오류',
                      description: '영양제 디스펜스 명령 전송에 실패했습니다.',
@@ -170,7 +207,12 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     try {
       const response = await fetch('/api/schedules');
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+          let errorMsg = `HTTP 오류! 상태 코드: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMsg = errorData.message || errorMsg;
+          } catch (e) { /* ignore */ }
+        throw new Error(errorMsg);
       }
       const data: Schedule[] = await response.json();
        // Sort schedules by day order (optional, if API doesn't guarantee order)
@@ -187,10 +229,10 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
 
       setSchedules(data);
     } catch (error: any) {
-      console.error('Failed to fetch schedules:', error);
+      console.error('스케줄 가져오기 실패:', error);
       toast({
         title: '오류',
-        description: '스케줄을 불러오는데 실패했습니다.',
+        description: `스케줄을 불러오는데 실패했습니다: ${error.message || '알 수 없는 오류'}`,
         variant: 'destructive',
       });
     }
@@ -214,8 +256,12 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: '알 수 없는 오류' }));
-        throw new Error(`HTTP error! status: ${response.status} - ${errorData.message}`);
+        let errorMsg = `HTTP 오류! 상태 코드: ${response.status}`;
+        try {
+            const errorData = await response.json();
+            errorMsg = errorData.message || errorMsg;
+        } catch (e) { /* ignore */ }
+        throw new Error(errorMsg);
       }
 
       toast({
@@ -225,16 +271,16 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       fetchSchedules(); // Refresh list
       closeScheduleModal(); // Close modal on success
     } catch (error: any) {
-      console.error('Failed to add schedule:', error);
+      console.error('스케줄 추가 실패:', error);
       toast({
         title: '오류',
-        description: `스케줄 추가 실패: ${error.message}`,
+        description: `스케줄 추가 실패: ${error.message || '알 수 없는 오류'}`,
         variant: 'destructive',
       });
     }
   };
 
-  const deleteSchedule = async (id: string) => {
+ const deleteSchedule = async (id: string) => {
     // Optimistic UI update: Remove the schedule immediately
     const originalSchedules = [...schedules]; // Keep a copy for potential revert
     setSchedules(prevSchedules => prevSchedules.filter(schedule => schedule.id !== id));
@@ -244,30 +290,35 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
             method: 'DELETE',
         });
 
+        const result = await response.json().catch(() => ({})); // Attempt to parse JSON, default to empty object on error
+
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: '알 수 없는 오류' }));
             // Revert optimistic update on failure
             setSchedules(originalSchedules);
-            throw new Error(`HTTP error! status: ${response.status} - ${errorData.message}`);
+            // Use message from response body if available, otherwise generate default
+            const errorMessage = result.message || `HTTP 오류! 상태 코드: ${response.status}`;
+            throw new Error(errorMessage);
         }
 
-
+        // Success: Keep optimistic update
         toast({
             title: '성공',
-            description: '스케줄이 삭제되었습니다.',
+            description: result.message || '스케줄이 삭제되었습니다.', // Use message from response if available
         });
         // No need to fetchSchedules here if optimistic update is kept on success
+
     } catch (error: any) {
-        console.error('Failed to delete schedule:', error);
+        console.error('스케줄 삭제 실패:', error);
         // Ensure state is reverted if it hasn't been already
         setSchedules(originalSchedules);
         toast({
             title: '오류',
-            description: `스케줄 삭제 실패: ${error.message}`,
+            description: `스케줄 삭제 실패: ${error.message || '알 수 없는 오류'}`,
             variant: 'destructive',
         });
     }
 };
+
 
   // --- LED Control ---
   const controlLed = async (state: 'on' | 'off') => {
@@ -284,20 +335,26 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
         body: JSON.stringify({ state }),
       });
 
-      const result = await response.json(); // Attempt to parse JSON regardless of status
+       let result = { message: '' }; // Default result structure
+        try {
+            result = await response.json(); // Attempt to parse JSON
+        } catch (e) {
+            // If response is not JSON, handle accordingly
+            console.warn('LED control API did not return valid JSON.');
+        }
 
       if (!response.ok) {
         // Try to use the message from the response body if available
-        throw new Error(result.message || `HTTP error! status: ${response.status}`);
+        throw new Error(result.message || `HTTP 오류! 상태 코드: ${response.status}`);
       }
 
       // On success, the optimistic update is kept.
       toast({
         title: '명령 전송 성공',
-        description: `LED ${state === 'on' ? '켜기' : '끄기'} 명령이 ESP32 상태 업데이트 요청으로 전송되었습니다.`,
+        description: result.message || `LED ${state === 'on' ? '켜기' : '끄기'} 명령이 ESP32 상태 업데이트 요청으로 전송되었습니다.`,
       });
     } catch (error: any) {
-        console.error(`Failed to send LED ${state} command:`, error);
+        console.error(`LED ${state} 명령 전송 실패:`, error);
         setLedStatus(previousStatus); // Revert optimistic update on failure
         toast({
           title: '명령 전송 오류',
