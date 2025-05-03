@@ -8,6 +8,7 @@ type Mapping = {
 const dataFilePath = path.join(process.cwd(), 'src/data', 'mapping.json');
 const dataDir = path.dirname(dataFilePath);
 
+// Function to ensure the data directory exists
 async function ensureDirectoryExists() {
     try {
         await fs.access(dataDir);

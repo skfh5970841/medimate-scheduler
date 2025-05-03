@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast"; // Import toast for notifications
+import type { Supplement } from "@/services/supplements"; // Import Supplement type
 
 interface Mapping {
   [supplementName: string]: number;
@@ -29,19 +30,55 @@ interface MappingModalProps {
 }
 
 export function MappingModal({ isOpen, onClose }: MappingModalProps) {
-  const [supplementNames, setSupplementNames] = useState<string[]>([]);
+  const [allSupplements, setAllSupplements] = useState<Supplement[]>([]); // State for all available supplements
   const [currentMapping, setCurrentMapping] = useState<Mapping>({});
-  const [selectedSupplement, setSelectedSupplement] = useState<string>("");
+  const [selectedSupplement, setSelectedSupplement] = useState<string>(""); // Store supplement name
   const [selectedMotor, setSelectedMotor] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false); // Add loading state
   const [isDeleting, setIsDeleting] = useState(false); // Add deleting state
 
   const motorNumbers = [1, 2, 3, 4, 5, 6, 7, 8]; // Define motor numbers
 
-  // Fetch existing mapping when the modal opens
+  // Fetch all supplements and existing mapping when the modal opens
   useEffect(() => {
-    const fetchMapping = async () => {
+    const fetchData = async () => {
       if (!isOpen) return; // Only fetch when modal is open
+
+      // 1. Fetch all supplements from localStorage
+      try {
+        const storedSupplements = localStorage.getItem('supplements');
+        const parsedSupplements: Supplement[] = storedSupplements ? JSON.parse(storedSupplements) : [];
+         // Ensure default supplements are included if none found or error occurs
+         if (parsedSupplements.length === 0) {
+            // Add default if local storage is empty (can refine this logic)
+            const defaultSupplements = [
+              {id: 'vitamin-d', name: '비타민 D'},
+              {id: 'vitamin-c', name: '비타민 C'},
+              {id: 'calcium', name: '칼슘'},
+            ];
+            setAllSupplements(defaultSupplements);
+             // Optionally save defaults back to localStorage
+            localStorage.setItem('supplements', JSON.stringify(defaultSupplements));
+         } else {
+             setAllSupplements(parsedSupplements);
+         }
+
+      } catch (error) {
+        console.error('Error fetching supplements from local storage:', error);
+         const defaultSupplements = [
+            {id: 'vitamin-d', name: '비타민 D'},
+            {id: 'vitamin-c', name: '비타민 C'},
+            {id: 'calcium', name: '칼슘'},
+         ];
+         setAllSupplements(defaultSupplements); // Fallback to defaults
+        toast({
+            title: '오류',
+            description: '영양제 목록을 불러오는데 실패했습니다.',
+            variant: 'destructive',
+          });
+      }
+
+      // 2. Fetch existing mapping from API
       try {
         const response = await fetch("/api/dispenser-mapping");
         if (!response.ok) {
@@ -49,10 +86,6 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
         }
         const mapping: Mapping = await response.json();
         setCurrentMapping(mapping);
-        setSupplementNames(Object.keys(mapping));
-        // Reset selections when modal opens
-        setSelectedSupplement("");
-        setSelectedMotor("");
       } catch (error) {
         console.error("Error fetching mapping data:", error);
         toast({
@@ -60,12 +93,15 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
             description: '영양제 매핑 정보를 불러오는데 실패했습니다.',
             variant: 'destructive',
           });
-        setSupplementNames([]);
         setCurrentMapping({});
       }
+
+      // Reset selections when modal opens
+      setSelectedSupplement("");
+      setSelectedMotor("");
     };
 
-    fetchMapping();
+    fetchData();
   }, [isOpen]); // Re-fetch when modal opens
 
   // Update motor selection when supplement changes
@@ -107,6 +143,13 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
         throw new Error(errorData.message || "Failed to update mapping");
       }
 
+      // Update local mapping state immediately for responsiveness
+       setCurrentMapping(prev => ({
+            ...prev,
+            [selectedSupplement]: parseInt(selectedMotor),
+       }));
+
+
       toast({
         title: '성공',
         description: '영양제 매핑이 저장되었습니다.',
@@ -133,6 +176,16 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
        });
       return;
     }
+    // Check if the supplement actually has a mapping to delete
+     if (!(selectedSupplement in currentMapping)) {
+       toast({
+         title: '매핑 없음',
+         description: `선택한 영양제 '${selectedSupplement}'에 대한 매핑이 없습니다.`,
+         variant: 'destructive',
+       });
+       return;
+     }
+
 
     setIsDeleting(true);
     try {
@@ -150,15 +203,16 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
             title: '성공',
             description: `영양제 '${selectedSupplement}' 매핑이 삭제되었습니다.`,
         });
-        // Optionally refetch mapping or update local state
+        // Update local mapping state immediately
         setCurrentMapping(prev => {
             const newMapping = { ...prev };
             delete newMapping[selectedSupplement];
             return newMapping;
         });
-        setSupplementNames(prev => prev.filter(name => name !== selectedSupplement));
+        // No need to update allSupplements list here
         setSelectedSupplement(""); // Clear selection
-        onClose(); // Close modal on success (optional)
+        setSelectedMotor(""); // Clear motor selection as well
+        // Optionally close modal: onClose();
 
     } catch (error: any) {
       console.error("Error deleting mapping:", error);
@@ -179,7 +233,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
         <DialogHeader>
           <DialogTitle>영양제 매핑 설정</DialogTitle>
           <DialogDescription>
-            등록된 영양제와 디스펜서 모터 번호를 연결합니다.
+            영양제와 디스펜서 모터 번호를 연결합니다.
           </DialogDescription>
         </DialogHeader>
         {/* Form for submitting mapping */}
@@ -187,22 +241,24 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
           <div className="grid gap-2">
             <Label htmlFor="supplement">영양제 이름</Label>
             <Select
-              value={selectedSupplement} // Controlled component
+              value={selectedSupplement} // Controlled component using supplement name
               onValueChange={setSelectedSupplement}
             >
               <SelectTrigger id="supplement">
                 <SelectValue placeholder="영양제 선택" />
               </SelectTrigger>
               <SelectContent>
-                {supplementNames.length > 0 ? (
-                  supplementNames.map((name) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
+                {allSupplements.length > 0 ? (
+                  // Use allSupplements list here
+                  allSupplements.map((s) => (
+                    // Use supplement name as the value
+                    <SelectItem key={s.id} value={s.name}>
+                      {s.name}
                     </SelectItem>
                   ))
                 ) : (
                   <SelectItem value="no-supplements" disabled>
-                    등록된 영양제 없음
+                    등록된 영양제 없음 (스케줄 추가 시 생성됨)
                   </SelectItem>
                 )}
               </SelectContent>
@@ -213,6 +269,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
             <Select
               value={selectedMotor} // Controlled component
               onValueChange={setSelectedMotor}
+              disabled={!selectedSupplement} // Disable motor selection if no supplement is chosen
             >
               <SelectTrigger id="motor">
                 <SelectValue placeholder="모터 선택" />
@@ -235,11 +292,12 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
                 type="button"
                 onClick={handleDelete}
                 variant="destructive"
-                disabled={!selectedSupplement || isSubmitting || isDeleting} // Disable if no supplement selected
+                // Disable if no supplement selected OR if the selected one has no mapping OR during actions
+                disabled={!selectedSupplement || !(selectedSupplement in currentMapping) || isSubmitting || isDeleting}
               >
                 {isDeleting ? '삭제 중...' : '삭제'}
               </Button>
-            <Button type="submit" disabled={isSubmitting || isDeleting}>
+            <Button type="submit" disabled={!selectedSupplement || !selectedMotor || isSubmitting || isDeleting}>
                {isSubmitting ? '저장 중...' : '저장'}
             </Button>
           </div>

@@ -313,8 +313,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
 
   const openScheduleModal = () => setIsScheduleModalOpen(true);
   const closeScheduleModal = () => setIsScheduleModalOpen(false);
-  const openMappingModal = () => setIsMappingModalOpen(true);
-  const closeMappingModal = () => setIsMappingModalOpen(false);
+  const openMappingModal = () => setIsMappingModalOpen(true); // Function to open mapping modal
+  const closeMappingModal = () => setIsMappingModalOpen(false); // Function to close mapping modal
 
   const daysOfWeek = Object.keys(daysOfWeekMap); // English keys for logic
 
@@ -386,6 +386,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
              <LightbulbOff className="h-5 w-5" />
            </Button>
            {/* End LED Control Buttons */}
+            {/* Mapping Settings Button */}
             <Button onClick={openMappingModal} variant="outline" title="영양제 매핑 설정">
                 <Settings className="mr-2 h-4 w-4" /> 매핑 설정
             </Button>
@@ -444,8 +445,9 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       <ScheduleModal
         isOpen={isScheduleModalOpen}
         onClose={closeScheduleModal}
-        onAddSchedule={addSchedule}
+        onAddSchedule={addSchedule} // Pass addSchedule directly
         />
+       {/* Mapping Modal */}
        <MappingModal
          isOpen={isMappingModalOpen} // Pass state variable
          onClose={closeMappingModal} // Pass closing function
