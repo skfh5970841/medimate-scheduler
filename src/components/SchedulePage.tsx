@@ -8,7 +8,7 @@ import {ScheduleModal} from '@/components/ScheduleModal';
 import {Schedule} from '@/types';
 import {toast} from '@/hooks/use-toast';
 import {MappingModal} from '@/components/MappingModal';
-import {Trash2, Lightbulb, LightbulbOff, PlusCircle, Settings} from 'lucide-react'; // Import Settings icon
+import {Trash2, Lightbulb, LightbulbOff, PlusCircle, Settings, LogOut, User} from 'lucide-react'; // Import Settings, LogOut, User icons
 
 interface SchedulePageProps {
   onLogout: () => void;
@@ -431,18 +431,24 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
 
 
   return (
-    <div className="container mx-auto p-4 max-w-7xl"> {/* Added max-w-7xl for better large screen layout */}
-      <header className="flex justify-between items-center mb-6 border-b pb-4">
-       <div className="text-sm text-muted-foreground flex-shrink-0 pr-4"> {/* Added flex-shrink-0 and padding */}
-            {username ? `사용자: ${username}` : '로그인되지 않음'}
-       </div>
-        <div className="text-center flex-grow"> {/* Added flex-grow */}
-          <h1 className="text-3xl font-bold mb-1">주간 영양제 스케줄</h1>
-          <p className="text-lg text-muted-foreground">
-            {currentDate} ({currentDayKor})
-          </p>
+    <div className="container mx-auto p-4 max-w-full sm:max-w-7xl"> {/* Adjust max-width for responsiveness */}
+      {/* Header: Adjusted for mobile */}
+      <header className="flex flex-col sm:flex-row justify-between items-center mb-6 border-b pb-4 space-y-4 sm:space-y-0">
+        {/* User Info and Date/Time (Left/Top on Mobile) */}
+        <div className="flex flex-col sm:flex-row items-center text-center sm:text-left w-full sm:w-auto space-y-2 sm:space-y-0 sm:space-x-4">
+           <div className="text-sm text-muted-foreground flex items-center">
+                <User className="mr-1 h-4 w-4" /> {username ? `사용자: ${username}` : '로그인되지 않음'}
+           </div>
+           <div className="text-center">
+             <h1 className="text-2xl sm:text-3xl font-bold mb-1">주간 영양제 스케줄</h1>
+             <p className="text-base sm:text-lg text-muted-foreground">
+               {currentDate} ({currentDayKor})
+             </p>
+           </div>
         </div>
-        <div className="flex items-center space-x-2 flex-shrink-0 pl-4"> {/* Added flex-shrink-0 and padding */}
+
+        {/* Controls (Right/Bottom on Mobile) */}
+        <div className="flex flex-wrap justify-center sm:justify-end items-center space-x-2 w-full sm:w-auto">
            {/* LED Control Buttons */}
            <Button
              onClick={() => controlLed('on')}
@@ -450,7 +456,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
              size="icon"
              title="LED 켜기"
              disabled={isLedLoading || ledStatus === 'on'}
-             aria-label="LED 켜기" // Accessibility
+             aria-label="LED 켜기"
+             className="flex-shrink-0"
             >
              <Lightbulb className="h-5 w-5" />
            </Button>
@@ -460,53 +467,60 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
              size="icon"
              title="LED 끄기"
              disabled={isLedLoading || ledStatus === 'off'}
-             aria-label="LED 끄기" // Accessibility
+             aria-label="LED 끄기"
+             className="flex-shrink-0"
             >
              <LightbulbOff className="h-5 w-5" />
            </Button>
-           {/* End LED Control Buttons */}
-            {/* Mapping Settings Button */}
-            <Button onClick={openMappingModal} variant="outline" title="영양제 매핑 설정">
-                <Settings className="mr-2 h-4 w-4" /> 매핑 설정
+
+           {/* Separator for visual grouping on mobile */}
+           <div className="w-px h-6 bg-border mx-1 hidden sm:block"></div>
+
+           {/* Mapping Settings Button */}
+            <Button onClick={openMappingModal} variant="outline" title="영양제 매핑 설정" className="flex-shrink-0">
+                <Settings className="mr-1 sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">매핑 설정</span>
             </Button>
-            <Button onClick={openScheduleModal} title="새 스케줄 추가">
-                <PlusCircle className="mr-2 h-4 w-4" /> 스케줄 추가
+            {/* Add Schedule Button */}
+            <Button onClick={openScheduleModal} title="새 스케줄 추가" className="flex-shrink-0">
+                <PlusCircle className="mr-1 sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">스케줄 추가</span>
             </Button>
-            <Button variant="outline" onClick={onLogout} title="로그아웃">
-                로그아웃
+             {/* Logout Button */}
+            <Button variant="outline" onClick={onLogout} title="로그아웃" className="flex-shrink-0">
+                 <LogOut className="mr-1 sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">로그아웃</span>
             </Button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4"> {/* Adjusted grid for responsiveness */}
+      {/* Schedule Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {groupedSchedules.map(({day, korDay, times}) => (
-          <Card key={day} className={`flex flex-col ${day === currentDayEng ? 'border-primary border-2 shadow-lg' : 'border'}`}> {/* Added flex flex-col */}
-            <CardHeader className="bg-muted/50 p-3"> {/* Reduced padding */}
-              <CardTitle className="text-center text-lg">{korDay}</CardTitle> {/* Adjusted text size */}
+          <Card key={day} className={`flex flex-col ${day === currentDayEng ? 'border-primary border-2 shadow-lg' : 'border'}`}>
+            <CardHeader className="bg-muted/50 p-3">
+              <CardTitle className="text-center text-lg">{korDay}</CardTitle>
             </CardHeader>
-            <CardContent className="pt-4 flex-grow overflow-y-auto"> {/* Added flex-grow and overflow */}
+            <CardContent className="pt-4 flex-grow overflow-y-auto">
              {times.length === 0 ? (
                  <p className="text-sm text-center text-muted-foreground py-4">스케줄 없음</p>
              ) : (
                 times.map(({time, supplements}) => (
-                    <div key={`${day}-${time}`} className="mb-3 p-3 rounded-md bg-card border border-border shadow-sm relative group"> {/* Use bg-card, added relative group */}
-                    <p className="font-semibold mb-2 text-center text-md">{time}</p> {/* Adjusted text size */}
+                    <div key={`${day}-${time}`} className="mb-3 p-3 rounded-md bg-card border border-border shadow-sm relative group">
+                    <p className="font-semibold mb-2 text-center text-md">{time}</p>
                     <div className="flex flex-col space-y-1">
                         {supplements.map((s) => (
-                        <div key={s.id} className="flex items-center justify-between text-sm p-1 rounded hover:bg-secondary/50 group/item"> {/* Use secondary/50, added group/item */}
-                            {/* Remove truncate, add min-w-0 to allow shrinking */}
+                        <div key={s.id} className="flex items-center justify-between text-sm p-1 rounded hover:bg-secondary/50 group/item">
+                            {/* Use min-w-0 and break-words for better wrapping/truncation */}
                             <span className="pr-2 flex-grow min-w-0 break-words">{s.supplement}</span>
                             {/* Delete Button */}
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive flex-shrink-0 opacity-0 group-hover/item:opacity-100 focus:opacity-100 transition-opacity" // Show on hover/focus
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive flex-shrink-0 opacity-0 group-hover/item:opacity-100 focus:opacity-100 transition-opacity"
                                 onClick={(e) => {
-                                    e.stopPropagation(); // Prevent card click events if any
+                                    e.stopPropagation();
                                     deleteSchedule(s.id);
                                 }}
                                 title={`${s.supplement} (${time}) 삭제`}
-                                aria-label={`${s.supplement} (${time}) 삭제`} // Accessibility
+                                aria-label={`${s.supplement} (${time}) 삭제`}
                                 >
                                 <Trash2 className="h-4 w-4" />
                             </Button>
@@ -525,14 +539,12 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       <ScheduleModal
         isOpen={isScheduleModalOpen}
         onClose={closeScheduleModal}
-        onAddSchedule={addSchedule} // Pass addSchedule directly
+        onAddSchedule={addSchedule}
         />
-       {/* Mapping Modal */}
        <MappingModal
-         isOpen={isMappingModalOpen} // Pass state variable
-         onClose={closeMappingModal} // Pass closing function
+         isOpen={isMappingModalOpen}
+         onClose={closeMappingModal}
         />
     </div>
   );
 };
-

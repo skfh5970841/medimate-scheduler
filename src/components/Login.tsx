@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, {useState} from 'react';
@@ -80,8 +81,9 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
   };
 
   return (
-    <Card className="w-96">
-      <CardHeader>
+    // Adjust width for mobile and center
+    <Card className="w-full max-w-md sm:w-96 mx-auto">
+      <CardHeader className="text-center">
         <CardTitle>{isRegistering ? '회원가입' : '로그인'}</CardTitle>
         <CardDescription>
           {isRegistering
@@ -91,9 +93,10 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
       </CardHeader>
       <CardContent>
         <form onSubmit={isRegistering ? handleRegistration : handleLogin} className="space-y-4">
-          {error && <div className="text-red-500">{error}</div>}
+          {error && <div className="text-red-500 text-center sm:text-left">{error}</div>}
           <div>
-            <label htmlFor="username" className="block text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            {/* Use block display for labels on mobile */}
+            <label htmlFor="username" className="block text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 mb-1">
               아이디
             </label>
             <Input
@@ -103,10 +106,11 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
+              className="w-full" // Ensure input takes full width
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+             <label htmlFor="password" className="block text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 mb-1">
               비밀번호
             </label>
             <Input
@@ -116,11 +120,12 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+               className="w-full"
             />
           </div>
           {isRegistering && (
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+               <label htmlFor="confirmPassword" className="block text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 mb-1">
                 비밀번호 확인
               </label>
               <Input
@@ -130,14 +135,19 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                 className="w-full"
               />
             </div>
           )}
-          <Button type="submit">{isRegistering ? '회원가입' : '로그인'}</Button>
+          {/* Center buttons on mobile */}
+          <div className="flex flex-col sm:flex-row sm:justify-start space-y-2 sm:space-y-0 sm:space-x-2 pt-2">
+            <Button type="submit" className="w-full sm:w-auto">{isRegistering ? '회원가입' : '로그인'}</Button>
+             <Button type="button" variant="link" onClick={toggleForm} className="w-full sm:w-auto text-center">
+                {isRegistering ? '계정이 이미 있으신가요? 로그인' : "계정이 없으신가요? 회원가입"}
+             </Button>
+          </div>
         </form>
-        <Button type="button" variant="link" onClick={toggleForm}>
-          {isRegistering ? '계정이 이미 있으신가요? 로그인' : "계정이 없으신가요? 회원가입"}
-        </Button>
+
       </CardContent>
     </Card>
   );
