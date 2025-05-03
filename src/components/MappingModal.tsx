@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -6,6 +7,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter, // Added DialogFooter
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -19,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast"; // Import toast for notifications
 import type { Supplement } from "@/services/supplements"; // Import Supplement type
+import { ScrollArea } from "@/components/ui/scroll-area"; // Import ScrollArea
+import { Separator } from "@/components/ui/separator"; // Import Separator
 
 interface Mapping {
   [supplementName: string]: number;
@@ -126,6 +130,25 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
     }
     setIsSubmitting(true);
 
+    const motorNumber = parseInt(selectedMotor);
+
+    // --- Conflict Check ---
+    const existingSupplementForMotor = Object.entries(currentMapping).find(
+        ([sup, motor]) => motor === motorNumber && sup !== selectedSupplement
+    );
+
+    if (existingSupplementForMotor) {
+        toast({
+            title: '매핑 충돌',
+            description: `모터 ${motorNumber}번은 이미 '${existingSupplementForMotor[0]}'에 할당되어 있습니다.`,
+            variant: 'destructive',
+        });
+        setIsSubmitting(false);
+        return;
+    }
+    // --- End Conflict Check ---
+
+
     try {
       const response = await fetch("/api/dispenser-mapping", {
         method: "POST",
@@ -134,7 +157,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
         },
         body: JSON.stringify({
           // Send only the selected mapping to update/add
-          [selectedSupplement]: parseInt(selectedMotor),
+          [selectedSupplement]: motorNumber,
         }),
       });
 
@@ -146,7 +169,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
       // Update local mapping state immediately for responsiveness
        setCurrentMapping(prev => ({
             ...prev,
-            [selectedSupplement]: parseInt(selectedMotor),
+            [selectedSupplement]: motorNumber,
        }));
 
 
@@ -154,7 +177,8 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
         title: '성공',
         description: '영양제 매핑이 저장되었습니다.',
       });
-      onClose(); // Close modal on success
+      // Don't close automatically, let user review
+      // onClose();
     } catch (error: any) {
       console.error("Error updating mapping:", error);
       toast({
@@ -226,18 +250,45 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
     }
   };
 
+  // Get currently used motors for conflict indication (optional)
+  const usedMotors = Object.values(currentMapping);
+
   return (
     // Use onOpenChange for better control over dialog state
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md"> {/* Increased width slightly */}
         <DialogHeader>
           <DialogTitle>영양제 매핑 설정</DialogTitle>
           <DialogDescription>
             영양제와 디스펜서 모터 번호를 연결합니다.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Display Current Mapping */}
+        <div className="mt-4 mb-2">
+            <h4 className="mb-2 text-sm font-medium">현재 매핑 상태</h4>
+            <Separator className="mb-3"/>
+            <ScrollArea className="h-24 rounded-md border p-2"> {/* Limit height and add scroll */}
+                {Object.keys(currentMapping).length > 0 ? (
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                        {Object.entries(currentMapping)
+                            .sort(([, motorA], [, motorB]) => motorA - motorB) // Sort by motor number
+                            .map(([supplement, motor]) => (
+                            <li key={supplement} className="flex justify-between">
+                                <span>{supplement}</span>
+                                <span>모터 {motor}</span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-sm text-center text-muted-foreground py-4">매핑된 영양제 없음</p>
+                )}
+            </ScrollArea>
+             <Separator className="mt-3"/>
+        </div>
+
         {/* Form for submitting mapping */}
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           <div className="grid gap-2">
             <Label htmlFor="supplement">영양제 이름</Label>
             <Select
@@ -275,18 +326,27 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
                 <SelectValue placeholder="모터 선택" />
               </SelectTrigger>
               <SelectContent>
-                {motorNumbers.map((number) => (
-                  <SelectItem key={number} value={number.toString()}>
-                    {number}
-                  </SelectItem>
-                ))}
+                {motorNumbers.map((number) => {
+                    const isUsedByOther = Object.entries(currentMapping).some(
+                        ([sup, motor]) => motor === number && sup !== selectedSupplement
+                    );
+                    return (
+                        <SelectItem
+                            key={number}
+                            value={number.toString()}
+                            disabled={isUsedByOther} // Disable if used by another supplement
+                        >
+                           {number} {isUsedByOther ? '(사용 중)' : ''}
+                        </SelectItem>
+                    );
+                 })}
               </SelectContent>
             </Select>
           </div>
-          {/* Buttons moved outside the form or handle type="button" */}
-           <div className="flex justify-end gap-2 pt-4">
+          {/* Buttons moved to DialogFooter */}
+           <DialogFooter className="pt-4">
              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting || isDeleting}>
-               취소
+               닫기 {/* Changed from 취소 */}
              </Button>
              <Button
                 type="button"
@@ -300,11 +360,11 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
             <Button type="submit" disabled={!selectedSupplement || !selectedMotor || isSubmitting || isDeleting}>
                {isSubmitting ? '저장 중...' : '저장'}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-
-
       </DialogContent>
     </Dialog>
   );
 }
+
+    
