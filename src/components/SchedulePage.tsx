@@ -6,7 +6,8 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {ScheduleModal} from '@/components/ScheduleModal';
 import {Schedule} from '@/types';
 import {toast} from '@/hooks/use-toast';
-import {Trash2, Lightbulb, LightbulbOff, PlusCircle} from 'lucide-react'; // Import LED icons and PlusCircle
+import {MappingModal} from '@/components/MappingModal';
+import {Trash2, Lightbulb, LightbulbOff, PlusCircle, Settings} from 'lucide-react'; // Import Settings icon
 
 interface SchedulePageProps {
   onLogout: () => void;
@@ -37,7 +38,8 @@ const daysOfWeekMap: {[key: string]: string} = {
 
 export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false); // State for mapping modal
   const [username, setUsername] = useState<string>('');
   const [ledStatus, setLedStatus] = useState<'on' | 'off' | 'unknown'>('unknown'); // Track LED status
   const [isLedLoading, setIsLedLoading] = useState<boolean>(false); // Track loading state for LED buttons
@@ -84,40 +86,77 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     if (storedUsername) {
       setUsername(storedUsername);
     } else {
+      // Handle case where username might not be set (e.g., direct navigation)
       console.warn("Username not found in localStorage.");
     }
   }, []); // Run only once on mount
 
   useEffect(() => {
-    const checkSchedules = () => {
+    const checkSchedules = async () => { // Make async to potentially await API calls
       const now = new Date();
       const currentDay = now.toLocaleDateString('en-US', {weekday: 'long'}); // Use English for matching keys
       const currentTime = now.toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit'});
 
-      schedules.forEach(schedule => {
+      for (const schedule of schedules) {
         if (schedule.day === currentDay && schedule.time === currentTime) {
           const notificationKey = `notificationShown-${schedule.id}-${now.toLocaleDateString()}`; // Unique key per schedule per day
 
           if (!sessionStorage.getItem(notificationKey)) { // Use sessionStorage to reset on browser close
             toast({ // Use toast for less intrusive notification
-                title: '영양제 섭취 시간',
-                description: `섭취해야 할 영양제: ${schedule.supplement}`,
+                title: '영양제 섭취 시간입니다.',
+                description: `섭취해야할 영양제 종류 : ${schedule.supplement}`,
                 duration: 10000, // Show for 10 seconds
             });
             sessionStorage.setItem(notificationKey, 'true');
 
-            // Trigger ESP32 API for supplement dispensing
-            // Consider if you need a separate API or if LED control implies dispensing
-            console.log(`Dispensing ${schedule.supplement}`);
-            // Example:
-            // fetch('/api/esp32/dispense', {
-            //   method: 'POST',
-            //   headers: {'Content-Type': 'application/json'},
-            //   body: JSON.stringify({ supplement: schedule.supplement }),
-            // }).then(...).catch(...);
+            // --- API Call for Dispensing (Placeholder) ---
+            // This is where you'd call an API to trigger the ESP32 dispenser
+            console.log(`[Notification] Time to take ${schedule.supplement}. Triggering dispense API...`);
+            try {
+                // Example: Fetch mapping to get motor number
+                const mappingResponse = await fetch('/api/dispenser-mapping');
+                if (!mappingResponse.ok) throw new Error('Failed to get mapping');
+                const mappingData = await mappingResponse.json();
+                const motorNumber = mappingData[schedule.supplement];
+
+                if (motorNumber) {
+                    console.log(`[Dispense] Mapped ${schedule.supplement} to motor ${motorNumber}. Sending command...`);
+                    // TODO: Replace with your actual dispense API endpoint and payload
+                    // const dispenseResponse = await fetch('/api/esp32/dispense', { // hypothetical endpoint
+                    //   method: 'POST',
+                    //   headers: {'Content-Type': 'application/json'},
+                    //   body: JSON.stringify({ motor: motorNumber }),
+                    // });
+                    // if (!dispenseResponse.ok) {
+                    //     console.error(`[Dispense Error] Failed to dispense ${schedule.supplement} (Motor ${motorNumber})`);
+                    //     // Optionally show an error toast to the user
+                    // } else {
+                    //     console.log(`[Dispense Success] Command sent for ${schedule.supplement} (Motor ${motorNumber})`);
+                    //     // Optionally show a success toast
+                    // }
+                } else {
+                    console.warn(`[Dispense Warning] No motor mapping found for supplement: ${schedule.supplement}. Cannot dispense.`);
+                     toast({
+                         title: '매핑 오류',
+                         description: `'${schedule.supplement}'에 대한 모터 매핑이 설정되지 않았습니다.`,
+                         variant: 'destructive',
+                         duration: 5000,
+                     });
+                }
+
+            } catch (error) {
+                console.error('[Dispense API Error] Failed to trigger dispense:', error);
+                 toast({
+                     title: '디스펜스 오류',
+                     description: '영양제 디스펜스 명령 전송에 실패했습니다.',
+                     variant: 'destructive',
+                     duration: 5000,
+                 });
+            }
+            // --- End API Call ---
           }
         }
-      });
+      }
     };
 
     // Check immediately on load and then every minute
@@ -125,7 +164,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     const intervalId = setInterval(checkSchedules, 60000); // 60000ms = 1 minute
 
     return () => clearInterval(intervalId); // Cleanup interval on unmount
-  }, [schedules]);
+  }, [schedules]); // Rerun effect when schedules change
 
   const fetchSchedules = async () => {
     try {
@@ -134,6 +173,18 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data: Schedule[] = await response.json();
+       // Sort schedules by day order (optional, if API doesn't guarantee order)
+       // and then by time within each day
+       const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+       data.sort((a, b) => {
+            const dayIndexA = dayOrder.indexOf(a.day);
+            const dayIndexB = dayOrder.indexOf(b.day);
+            if (dayIndexA !== dayIndexB) {
+                return dayIndexA - dayIndexB;
+            }
+            return compareTimes(a.time, b.time);
+       });
+
       setSchedules(data);
     } catch (error: any) {
       console.error('Failed to fetch schedules:', error);
@@ -145,14 +196,21 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     }
   };
 
-  const addSchedule = async (newSchedule: Schedule) => {
+  const addSchedule = async (newScheduleData: Omit<Schedule, 'id' | 'timestamp'>) => {
+     const timestamp = Date.now(); // Get current timestamp
+     const scheduleWithTimestamp: Schedule = {
+         ...newScheduleData,
+         id: `${timestamp}-${newScheduleData.day}-${newScheduleData.supplement.replace(/\s+/g, '-')}-${Math.random().toString(36).substring(2, 7)}`, // More unique ID
+         timestamp,
+     };
+
     try {
       const response = await fetch('/api/schedules', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newSchedule),
+        body: JSON.stringify(scheduleWithTimestamp), // Send full schedule object
       });
 
       if (!response.ok) {
@@ -165,6 +223,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
         description: '스케줄이 추가되었습니다.',
       });
       fetchSchedules(); // Refresh list
+      closeScheduleModal(); // Close modal on success
     } catch (error: any) {
       console.error('Failed to add schedule:', error);
       toast({
@@ -176,10 +235,11 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
   };
 
   const deleteSchedule = async (id: string) => {
-    try {
-        // Optimistic UI update: Remove the schedule immediately
-        setSchedules(prevSchedules => prevSchedules.filter(schedule => schedule.id !== id));
+    // Optimistic UI update: Remove the schedule immediately
+    const originalSchedules = [...schedules]; // Keep a copy for potential revert
+    setSchedules(prevSchedules => prevSchedules.filter(schedule => schedule.id !== id));
 
+    try {
         const response = await fetch(`/api/schedules/${id}`, {
             method: 'DELETE',
         });
@@ -187,7 +247,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: '알 수 없는 오류' }));
             // Revert optimistic update on failure
-            fetchSchedules(); // Refetch to get the correct state
+            setSchedules(originalSchedules);
             throw new Error(`HTTP error! status: ${response.status} - ${errorData.message}`);
         }
 
@@ -199,6 +259,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
         // No need to fetchSchedules here if optimistic update is kept on success
     } catch (error: any) {
         console.error('Failed to delete schedule:', error);
+        // Ensure state is reverted if it hasn't been already
+        setSchedules(originalSchedules);
         toast({
             title: '오류',
             description: `스케줄 삭제 실패: ${error.message}`,
@@ -225,13 +287,14 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
       const result = await response.json(); // Attempt to parse JSON regardless of status
 
       if (!response.ok) {
+        // Try to use the message from the response body if available
         throw new Error(result.message || `HTTP error! status: ${response.status}`);
       }
 
       // On success, the optimistic update is kept.
       toast({
         title: '명령 전송 성공',
-        description: `LED ${state === 'on' ? '켜기' : '끄기'} 명령이 ESP32로 전송되었습니다.`,
+        description: `LED ${state === 'on' ? '켜기' : '끄기'} 명령이 ESP32 상태 업데이트 요청으로 전송되었습니다.`,
       });
     } catch (error: any) {
         console.error(`Failed to send LED ${state} command:`, error);
@@ -248,8 +311,10 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
   // --- End LED Control ---
 
 
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
+  const openScheduleModal = () => setIsScheduleModalOpen(true);
+  const closeScheduleModal = () => setIsScheduleModalOpen(false);
+  const openMappingModal = () => setIsMappingModalOpen(true);
+  const closeMappingModal = () => setIsMappingModalOpen(false);
 
   const daysOfWeek = Object.keys(daysOfWeekMap); // English keys for logic
 
@@ -261,20 +326,21 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
 
     return {
       day, // Keep English day for key/logic if needed
+      korDay: daysOfWeekMap[day], // Korean day name for display
       times: times.map(time => ({
         time,
         supplements: schedulesForDay.filter(schedule => schedule.time === time)
                                     .map(schedule => ({
                                       id: schedule.id,
                                       supplement: schedule.supplement
-                                    })) // Keep original schedule structure for deletion
+                                    })) // Keep structure with ID for deletion
       }))
     };
   });
 
   const now = new Date();
   const currentDayEng = now.toLocaleDateString('en-US', {weekday: 'long'}); // English for matching
-  const currentDayKor = daysOfWeekMap[currentDayEng]; // Korean for display
+  const currentDayKor = daysOfWeekMap[currentDayEng] || '알 수 없는 요일'; // Korean for display, with fallback
 
   // Format date in YYYY년 MM월 DD일 format
     const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
@@ -286,72 +352,104 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
 
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6 border-b pb-4">
-       <div className="text-sm text-muted-foreground">
-            {username ? `로그인 사용자: ${username}` : '로그인되지 않음'}
+    <div className="container mx-auto p-4 max-w-7xl"> {/* Added max-w-7xl for better large screen layout */}
+      <header className="flex justify-between items-center mb-6 border-b pb-4">
+       <div className="text-sm text-muted-foreground flex-shrink-0 pr-4"> {/* Added flex-shrink-0 and padding */}
+            {username ? `사용자: ${username}` : '로그인되지 않음'}
        </div>
-        <div className="text-center">
+        <div className="text-center flex-grow"> {/* Added flex-grow */}
           <h1 className="text-3xl font-bold mb-1">주간 영양제 스케줄</h1>
           <p className="text-lg text-muted-foreground">
             {currentDate} ({currentDayKor})
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 flex-shrink-0 pl-4"> {/* Added flex-shrink-0 and padding */}
            {/* LED Control Buttons */}
-           <Button onClick={() => controlLed('on')} variant={ledStatus === 'on' ? "default" : "outline"} size="icon" title="LED 켜기 명령" disabled={isLedLoading || ledStatus === 'on'}>
+           <Button
+             onClick={() => controlLed('on')}
+             variant={ledStatus === 'on' ? "default" : "outline"}
+             size="icon"
+             title="LED 켜기"
+             disabled={isLedLoading || ledStatus === 'on'}
+             aria-label="LED 켜기" // Accessibility
+            >
              <Lightbulb className="h-5 w-5" />
            </Button>
-           <Button onClick={() => controlLed('off')} variant={ledStatus === 'off' ? "default" : "outline"} size="icon" title="LED 끄기 명령" disabled={isLedLoading || ledStatus === 'off'}>
+           <Button
+             onClick={() => controlLed('off')}
+             variant={ledStatus === 'off' ? "default" : "outline"}
+             size="icon"
+             title="LED 끄기"
+             disabled={isLedLoading || ledStatus === 'off'}
+             aria-label="LED 끄기" // Accessibility
+            >
              <LightbulbOff className="h-5 w-5" />
            </Button>
            {/* End LED Control Buttons */}
-          <Button onClick={openModal}>
-            <PlusCircle className="mr-2 h-4 w-4" /> 스케줄 추가
-          </Button>
-          <Button variant="outline" onClick={onLogout}>
-            로그아웃
-          </Button>
+            <Button onClick={openMappingModal} variant="outline" title="영양제 매핑 설정">
+                <Settings className="mr-2 h-4 w-4" /> 매핑 설정
+            </Button>
+            <Button onClick={openScheduleModal} title="새 스케줄 추가">
+                <PlusCircle className="mr-2 h-4 w-4" /> 스케줄 추가
+            </Button>
+            <Button variant="outline" onClick={onLogout} title="로그아웃">
+                로그아웃
+            </Button>
         </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {groupedSchedules.map(({day, times}) => (
-          <Card key={day} className={`${day === currentDayEng ? 'border-primary border-2 shadow-lg' : 'border'}`}>
-            <CardHeader className="bg-muted/50">
-              {/* Display Korean day name */}
-              <CardTitle className="text-center">{daysOfWeekMap[day]}</CardTitle>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4"> {/* Adjusted grid for responsiveness */}
+        {groupedSchedules.map(({day, korDay, times}) => (
+          <Card key={day} className={`flex flex-col ${day === currentDayEng ? 'border-primary border-2 shadow-lg' : 'border'}`}> {/* Added flex flex-col */}
+            <CardHeader className="bg-muted/50 p-3"> {/* Reduced padding */}
+              <CardTitle className="text-center text-lg">{korDay}</CardTitle> {/* Adjusted text size */}
             </CardHeader>
-            <CardContent className="pt-4">
-             {times.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">스케줄 없음</p>}
-              {times.map(({time, supplements}) => (
-                <div key={`${day}-${time}`} className="mb-3 p-3 rounded-md bg-secondary border border-border shadow-sm">
-                  <p className="font-semibold mb-2 text-center text-lg">{time}</p>
-                  <div className="flex flex-col space-y-1">
-                    {supplements.map((s) => (
-                      <div key={s.id} className="flex items-center justify-between text-sm p-1 rounded hover:bg-background">
-                        <span className="truncate pr-2">{s.supplement}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive flex-shrink-0"
-                          onClick={() => deleteSchedule(s.id)}
-                          title={`${s.supplement} (${time}) 삭제`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <CardContent className="pt-4 flex-grow overflow-y-auto"> {/* Added flex-grow and overflow */}
+             {times.length === 0 ? (
+                 <p className="text-sm text-center text-muted-foreground py-4">스케줄 없음</p>
+             ) : (
+                times.map(({time, supplements}) => (
+                    <div key={`${day}-${time}`} className="mb-3 p-3 rounded-md bg-card border border-border shadow-sm relative group"> {/* Use bg-card, added relative group */}
+                    <p className="font-semibold mb-2 text-center text-md">{time}</p> {/* Adjusted text size */}
+                    <div className="flex flex-col space-y-1">
+                        {supplements.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between text-sm p-1 rounded hover:bg-secondary/50 group/item"> {/* Use secondary/50, added group/item */}
+                            <span className="truncate pr-2 flex-grow">{s.supplement}</span> {/* Added flex-grow */}
+                            {/* Delete Button */}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive flex-shrink-0 opacity-0 group-hover/item:opacity-100 focus:opacity-100 transition-opacity" // Show on hover/focus
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Prevent card click events if any
+                                    deleteSchedule(s.id);
+                                }}
+                                title={`${s.supplement} (${time}) 삭제`}
+                                aria-label={`${s.supplement} (${time}) 삭제`} // Accessibility
+                                >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        ))}
+                    </div>
+                    </div>
+                ))
+            )}
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <ScheduleModal isOpen={isModalOpen} onClose={closeModal} onAddSchedule={addSchedule} />
+      {/* Modals */}
+      <ScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={closeScheduleModal}
+        onAddSchedule={addSchedule}
+        />
+       <MappingModal
+         isOpen={isMappingModalOpen} // Pass state variable
+         onClose={closeMappingModal} // Pass closing function
+        />
     </div>
   );
 };
-

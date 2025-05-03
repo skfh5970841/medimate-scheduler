@@ -3,4 +3,5 @@ export type Schedule = {
   supplement: string;
   day: string;
   time: string;
+  timestamp: number;
 };

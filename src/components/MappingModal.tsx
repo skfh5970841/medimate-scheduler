@@ -1,0 +1,252 @@
+'use client';
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast"; // Import toast for notifications
+
+interface Mapping {
+  [supplementName: string]: number;
+}
+
+interface MappingModalProps {
+  isOpen: boolean; // Renamed from 'open' for clarity
+  onClose: () => void; // Renamed from 'setOpen' for clarity
+}
+
+export function MappingModal({ isOpen, onClose }: MappingModalProps) {
+  const [supplementNames, setSupplementNames] = useState<string[]>([]);
+  const [currentMapping, setCurrentMapping] = useState<Mapping>({});
+  const [selectedSupplement, setSelectedSupplement] = useState<string>("");
+  const [selectedMotor, setSelectedMotor] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false); // Add loading state
+  const [isDeleting, setIsDeleting] = useState(false); // Add deleting state
+
+  const motorNumbers = [1, 2, 3, 4, 5, 6, 7, 8]; // Define motor numbers
+
+  // Fetch existing mapping when the modal opens
+  useEffect(() => {
+    const fetchMapping = async () => {
+      if (!isOpen) return; // Only fetch when modal is open
+      try {
+        const response = await fetch("/api/dispenser-mapping");
+        if (!response.ok) {
+          throw new Error("Failed to fetch mapping data");
+        }
+        const mapping: Mapping = await response.json();
+        setCurrentMapping(mapping);
+        setSupplementNames(Object.keys(mapping));
+        // Reset selections when modal opens
+        setSelectedSupplement("");
+        setSelectedMotor("");
+      } catch (error) {
+        console.error("Error fetching mapping data:", error);
+        toast({
+            title: '오류',
+            description: '영양제 매핑 정보를 불러오는데 실패했습니다.',
+            variant: 'destructive',
+          });
+        setSupplementNames([]);
+        setCurrentMapping({});
+      }
+    };
+
+    fetchMapping();
+  }, [isOpen]); // Re-fetch when modal opens
+
+  // Update motor selection when supplement changes
+   useEffect(() => {
+    if (selectedSupplement && currentMapping[selectedSupplement]) {
+      setSelectedMotor(currentMapping[selectedSupplement].toString());
+    } else {
+      setSelectedMotor(""); // Reset motor if supplement is not mapped or cleared
+    }
+  }, [selectedSupplement, currentMapping]);
+
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedSupplement || !selectedMotor) {
+      toast({
+        title: '입력 오류',
+        description: '영양제와 모터 번호를 모두 선택해주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/dispenser-mapping", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          // Send only the selected mapping to update/add
+          [selectedSupplement]: parseInt(selectedMotor),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || "Failed to update mapping");
+      }
+
+      toast({
+        title: '성공',
+        description: '영양제 매핑이 저장되었습니다.',
+      });
+      onClose(); // Close modal on success
+    } catch (error: any) {
+      console.error("Error updating mapping:", error);
+      toast({
+        title: '오류',
+        description: `매핑 저장 실패: ${error.message}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedSupplement) {
+       toast({
+         title: '선택 오류',
+         description: '삭제할 영양제를 선택해주세요.',
+         variant: 'destructive',
+       });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+        // Correctly use query parameter for DELETE request
+        const response = await fetch(`/api/dispenser-mapping?supplementName=${encodeURIComponent(selectedSupplement)}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            throw new Error(errorData.message || "Failed to delete mapping");
+        }
+
+        toast({
+            title: '성공',
+            description: `영양제 '${selectedSupplement}' 매핑이 삭제되었습니다.`,
+        });
+        // Optionally refetch mapping or update local state
+        setCurrentMapping(prev => {
+            const newMapping = { ...prev };
+            delete newMapping[selectedSupplement];
+            return newMapping;
+        });
+        setSupplementNames(prev => prev.filter(name => name !== selectedSupplement));
+        setSelectedSupplement(""); // Clear selection
+        onClose(); // Close modal on success (optional)
+
+    } catch (error: any) {
+      console.error("Error deleting mapping:", error);
+      toast({
+          title: '오류',
+          description: `매핑 삭제 실패: ${error.message}`,
+          variant: 'destructive',
+      });
+    } finally {
+        setIsDeleting(false);
+    }
+  };
+
+  return (
+    // Use onOpenChange for better control over dialog state
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>영양제 매핑 설정</DialogTitle>
+          <DialogDescription>
+            등록된 영양제와 디스펜서 모터 번호를 연결합니다.
+          </DialogDescription>
+        </DialogHeader>
+        {/* Form for submitting mapping */}
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          <div className="grid gap-2">
+            <Label htmlFor="supplement">영양제 이름</Label>
+            <Select
+              value={selectedSupplement} // Controlled component
+              onValueChange={setSelectedSupplement}
+            >
+              <SelectTrigger id="supplement">
+                <SelectValue placeholder="영양제 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {supplementNames.length > 0 ? (
+                  supplementNames.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="no-supplements" disabled>
+                    등록된 영양제 없음
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="motor">모터 번호</Label>
+            <Select
+              value={selectedMotor} // Controlled component
+              onValueChange={setSelectedMotor}
+            >
+              <SelectTrigger id="motor">
+                <SelectValue placeholder="모터 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {motorNumbers.map((number) => (
+                  <SelectItem key={number} value={number.toString()}>
+                    {number}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Buttons moved outside the form or handle type="button" */}
+           <div className="flex justify-end gap-2 pt-4">
+             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting || isDeleting}>
+               취소
+             </Button>
+             <Button
+                type="button"
+                onClick={handleDelete}
+                variant="destructive"
+                disabled={!selectedSupplement || isSubmitting || isDeleting} // Disable if no supplement selected
+              >
+                {isDeleting ? '삭제 중...' : '삭제'}
+              </Button>
+            <Button type="submit" disabled={isSubmitting || isDeleting}>
+               {isSubmitting ? '저장 중...' : '저장'}
+            </Button>
+          </div>
+        </form>
+
+
+      </DialogContent>
+    </Dialog>
+  );
+}

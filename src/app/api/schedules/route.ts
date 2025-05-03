@@ -29,14 +29,22 @@ export async function GET(request: Request) {
     const {searchParams} = new URL(request.url);
     const lastUpdated = searchParams.get('lastUpdated');
 
+    if (lastUpdated && isNaN(Number(lastUpdated))) {
+      return new NextResponse('Invalid lastUpdated parameter. It must be a number.', { status: 400 });
+    }
+
     let schedules = await readSchedules();
 
     if (lastUpdated) {
-      const lastUpdatedTime = new Date(lastUpdated).getTime();
-      schedules = schedules.filter(schedule => {
-        // Assuming schedule.id contains a timestamp part (e.g., "1744943954408-Monday")
-        const scheduleTimestamp = new Date(parseInt(schedule.id.split('-')[0])).getTime();
-        return scheduleTimestamp > lastUpdatedTime;
+        const lastUpdatedTime = parseInt(lastUpdated, 10);
+
+        if (isNaN(lastUpdatedTime)) {
+            return new NextResponse('Invalid lastUpdated parameter. It must be a valid timestamp.', { status: 400 });
+        }
+
+        schedules = schedules.filter(schedule => {
+            return schedule.timestamp > lastUpdatedTime;
+
       });
     }
 
