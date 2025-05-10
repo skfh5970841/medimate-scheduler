@@ -1,13 +1,14 @@
 'use client';
 
 import React, {useState, useEffect} from 'react';
+import Link from 'next/link'; // Import Link
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {ScheduleModal} from '@/components/ScheduleModal';
 import {Schedule} from '@/types';
 import {toast} from '@/hooks/use-toast';
 import {MappingModal} from '@/components/MappingModal';
-import {Trash2, Lightbulb, LightbulbOff, PlusCircle, Settings, LogOut, User} from 'lucide-react'; // Import Settings, LogOut, User icons
+import {Trash2, Lightbulb, LightbulbOff, PlusCircle, Settings, LogOut, User, PackageSearch } from 'lucide-react'; // Import PackageSearch
 
 interface SchedulePageProps {
   onLogout: () => void;
@@ -168,7 +169,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
     const intervalId = setInterval(checkSchedules, 60000); 
 
     return () => clearInterval(intervalId); 
-  }, [schedules]); 
+  }, [schedules, fetchMapping]); // Added fetchMapping to dependency array
 
   const fetchSchedules = async () => {
     try {
@@ -414,6 +415,14 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
            </Button>
 
            <div className="w-px h-6 bg-border mx-1 hidden sm:block"></div>
+
+           <Link href="/supplements-admin" passHref legacyBehavior>
+             <Button asChild variant="outline" title="영양제 관리" className="flex-shrink-0">
+               <a>
+                 <PackageSearch className="mr-1 sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">영양제 관리</span>
+               </a>
+             </Button>
+           </Link>
 
             <Button onClick={openMappingModal} variant="outline" title="영양제 매핑 설정" className="flex-shrink-0">
                 <Settings className="mr-1 sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">매핑 설정</span>
