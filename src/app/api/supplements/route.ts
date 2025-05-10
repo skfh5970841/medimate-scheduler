@@ -1,4 +1,3 @@
-
 import { NextResponse, NextRequest } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -94,7 +93,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: '삭제할 영양제 ID가 필요합니다.' }, { status: 400 });
     }
 
-    // Check if the supplement is used in schedules or mappings
     const schedules = await readData<Schedule[]>(schedulesFilePath, []);
     const supplementsList = await readData<Supplement[]>(supplementsFilePath, []);
     const supplementNameToDelete = supplementsList.find(s => s.id === supplementIdToDelete)?.name;
