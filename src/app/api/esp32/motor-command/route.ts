@@ -122,4 +122,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ status: "no_command_due", checkedTime: currentTimeString, checkedDay: currentDayString }, { status: 200 });
     }
 
-  } catch (error)
+  } catch (error) {
+    console.error('[API /api/esp32/motor-command GET] Error processing request:', error);
+    // It's important for the ESP32 to get a valid JSON response even on error,
+    // or at least a clear error status.
+    return NextResponse.json({ error: "Internal server error while processing motor command request.", details: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
+}
