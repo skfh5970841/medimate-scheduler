@@ -10,6 +10,10 @@ export interface Supplement {
    * The name of the supplement.
    */
   name: string;
+  /**
+   * The remaining quantity of the supplement. Optional.
+   */
+  quantity?: number;
 }
 
 /**
@@ -29,7 +33,14 @@ export async function getSupplements(): Promise<Supplement[]> {
     // For simplicity, let's assume the file content can be directly imported or fetched.
     // This is a placeholder for actual file reading logic.
     const supplementsData = await import('../data/supplements.json');
-    return supplementsData.default || supplementsData;
+    // Ensure that the imported data conforms to Supplement[] type, 
+    // especially when quantity might be missing in some records.
+    const supplements = (supplementsData.default || supplementsData) as any[];
+    return supplements.map(s => ({
+      id: s.id,
+      name: s.name,
+      quantity: s.quantity // This will be undefined if not present, which is fine for optional field
+    }));
   } catch (error) {
     console.error("Failed to load supplements:", error);
     return [];

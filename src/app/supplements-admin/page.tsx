@@ -12,12 +12,14 @@ import { PlusCircle, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 interface Supplement {
   id: string;
   name: string;
+  quantity?: number; // quantity 필드 추가 (옵셔널)
 }
 
 export default function SupplementsAdminPage() {
   const [supplements, setSupplements] = useState<Supplement[]>([]);
   const [newSupplementId, setNewSupplementId] = useState<string>('');
   const [newSupplementName, setNewSupplementName] = useState<string>('');
+  // newSupplementQuantity 상태는 추가 시점에 사용하지 않으므로 제거, 필요시 다시 추가 가능
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,17 +55,20 @@ export default function SupplementsAdminPage() {
     }
     setIsSubmitting(true);
     try {
+      // 추가 시에는 quantity를 보내지 않음. 서버에서 supplements.json 생성 시 quantity 필드를 초기화하거나
+      // ESP32가 업데이트 하도록 함. 또는 필요에 따라 초기 quantity 입력 필드 추가 가능.
       const response = await fetch('/api/supplements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: newSupplementId.trim(), name: newSupplementName.trim() }),
       });
-      const result = await response.json();
+      const result = await response.json(); // 여기서 반환되는 객체에는 quantity가 없을 수 있음
       if (!response.ok) {
         throw new Error(result.message || '영양제 추가 실패');
       }
       toast({ title: '성공', description: `'${result.name}' 영양제가 추가되었습니다.` });
-      setSupplements(prev => [...prev, result]);
+      // 서버에서 반환된 객체로 상태 업데이트 (quantity가 없다면 undefined가 됨)
+      setSupplements(prev => [...prev, result as Supplement]);
       setNewSupplementId('');
       setNewSupplementName('');
     } catch (err: any) {
@@ -78,7 +83,7 @@ export default function SupplementsAdminPage() {
 주의: 이 영양제를 사용하는 스케줄이나 매핑이 있다면 삭제되지 않습니다.`)) {
       return;
     }
-    setIsSubmitting(true); // Use isSubmitting to disable buttons during delete as well
+    setIsSubmitting(true);
     try {
       const response = await fetch(`/api/supplements?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
@@ -101,7 +106,7 @@ export default function SupplementsAdminPage() {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>새 영양제 추가</CardTitle>
-          <CardDescription>시스템에서 사용할 수 있는 새로운 영양제를 등록합니다.</CardDescription>
+          <CardDescription>시스템에서 사용할 수 있는 새로운 영양제를 등록합니다. 초기 수량은 ESP32에 의해 업데이트됩니다.</CardDescription>
         </CardHeader>
         <form onSubmit={handleAddSupplement}>
           <CardContent className="space-y-4">
@@ -114,7 +119,7 @@ export default function SupplementsAdminPage() {
                         onChange={(e) => setNewSupplementId(e.target.value)} 
                         placeholder="예: vitamin-c (영어, 숫자, 하이픈만)"
                         disabled={isSubmitting}
-                        pattern="^[a-zA-Z0-9-]+$" // Basic pattern for ID
+                        pattern="^[a-zA-Z0-9-]+$"
                         title="ID는 영어, 숫자, 하이픈만 사용할 수 있습니다."
                     />
                 </div>
@@ -146,7 +151,7 @@ export default function SupplementsAdminPage() {
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
-          <CardDescription>현재 시스템에 등록되어 스케줄 및 매핑에 사용할 수 있는 영양제들입니다.</CardDescription>
+          <CardDescription>현재 시스템에 등록되어 스케줄 및 매핑에 사용할 수 있는 영양제들입니다. 잔량은 ESP32에서 업데이트됩니다.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading && <p className="text-center py-4">영양제 목록을 불러오는 중...</p>}
@@ -163,6 +168,7 @@ export default function SupplementsAdminPage() {
                 <TableRow>
                   <TableHead>ID</TableHead>
                   <TableHead>이름</TableHead>
+                  <TableHead>잔량</TableHead> {/* 잔량 헤더 추가 */}
                   <TableHead className="text-right">작업</TableHead>
                 </TableRow>
               </TableHeader>
@@ -171,6 +177,7 @@ export default function SupplementsAdminPage() {
                   <TableRow key={s.id}>
                     <TableCell className="font-mono">{s.id}</TableCell>
                     <TableCell>{s.name}</TableCell>
+                    <TableCell>{s.quantity !== undefined ? s.quantity : 'N/A'}</TableCell> {/* 잔량 표시 */}
                     <TableCell className="text-right">
                       <Button 
                         variant="destructive"

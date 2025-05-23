@@ -1,6 +1,6 @@
 // 파일 경로: src/app/api/esp32/led/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getLedState, setLedState } from '@/lib/ledState'; // 상태 관리 유틸리티 import (경로 수정)
+import { getLedState, setLedState } from '@/lib/ledState'; // 상태 관리 유틸리티 import
 
 // GET: ESP32가 이 경로로 폴링하여 최신 LED 상태 명령을 가져갑니다.
 export async function GET(request: NextRequest) {
