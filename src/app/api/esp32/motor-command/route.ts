@@ -1,29 +1,35 @@
 // 파일 경로: src/app/api/esp32/motor-command/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { promises as fs } from 'fs'; // Import fs
+import path from 'path'; // Import path
 
-// default_api.read_file을 사용하기 위한 타입 (응답 객체 구조에 맞춤)
-interface ReadFileResponse {
-  read_file_response: {
-    result: string; // 파일 내용이 문자열로 반환됨
-    status: string;
-  };
-}
+// Data file paths
+const schedulesFilePath = path.join(process.cwd(), 'src/data', 'schedules.json');
+const mappingFilePath = path.join(process.cwd(), 'src/data', 'mapping.json');
 
 // 데이터 파일의 타입 정의
 interface Schedule {
   id: string;
-  supplement: string; 
-  day: string; 
-  time: string; 
-  quantity?: number; // 알약 개수 (이제부터 사용될 필드)
+  supplement: string; // This is supplement name
+  day: string;
+  time: string;
+  quantity?: number; // 알약 개수
   timestamp: number;
 }
 
-interface Mapping {
-  dispenserId: string;
-  supplementId: string; 
+// Type for the simplified mapping.json (supplementName: motorId)
+type SimpleMapping = {
+  [supplementName: string]: number;
+};
+
+// API 응답을 위한 명령 타입
+interface MotorCommand {
   motorId: number;
-  rotationsPerPill: number; // 알약 1개당 회전 수
+  rotations: number;
+  supplement: string;
+  scheduleId: string;
+  quantity: number;
+  rotationsPerPill: number;
 }
 
 function getDayStringForSchedule(dayNumber: number): string {
@@ -34,19 +40,41 @@ function getDayStringForSchedule(dayNumber: number): string {
 export async function GET(request: NextRequest) {
   console.log('[API /api/esp32/motor-command GET] Request received at', new Date().toISOString());
   try {
-    const schedulesResponse = (await default_api.read_file(path: 'src/data/schedules.json')) as ReadFileResponse;
-    const schedules: Schedule[] = JSON.parse(schedulesResponse.read_file_response.result);
+    let schedules: Schedule[];
+    try {
+      const schedulesFileContent = await fs.readFile(schedulesFilePath, 'utf8');
+      schedules = schedulesFileContent.trim() ? JSON.parse(schedulesFileContent) as Schedule[] : [];
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        console.log('[API GET] schedules.json not found. Defaulting to empty array.');
+        schedules = [];
+      } else {
+        console.error('[API GET] Error reading or parsing schedules.json:', error);
+        schedules = []; // Default to empty array on other errors
+      }
+    }
 
-    const mappingResponse = (await default_api.read_file(path: 'src/data/mapping.json')) as ReadFileResponse;
-    const mappings: Mapping[] = JSON.parse(mappingResponse.read_file_response.result);
+    let mappings: SimpleMapping;
+    try {
+      const mappingFileContent = await fs.readFile(mappingFilePath, 'utf8');
+      mappings = mappingFileContent.trim() ? JSON.parse(mappingFileContent) as SimpleMapping : {};
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        console.log('[API GET] mapping.json not found. Defaulting to empty object.');
+        mappings = {};
+      } else {
+        console.error('[API GET] Error reading or parsing mapping.json:', error);
+        mappings = {}; // Default to empty object on other errors
+      }
+    }
 
-    if (!schedules || schedules.length === 0) {
-      console.log('[API GET] No schedules found.');
+    if (schedules.length === 0) {
+      console.log('[API GET] No schedules found or error reading schedules.json.');
       return NextResponse.json({ status: "no_schedules_configured" }, { status: 200 });
     }
 
-    if (!mappings || mappings.length === 0) {
-      console.log('[API GET] No mappings found.');
+    if (Object.keys(mappings).length === 0) {
+      console.log('[API GET] No mappings found or error reading mapping.json.');
       return NextResponse.json({ status: "no_mappings_configured" }, { status: 200 });
     }
 
@@ -56,46 +84,42 @@ export async function GET(request: NextRequest) {
 
     console.log(`[API GET] Current time: ${currentDayString} ${currentTimeString}`);
 
-    let commandToSend = null;
+    const commandsToSend: MotorCommand[] = [];
+    const DEFAULT_ROTATIONS_PER_PILL = 1; // rotationsPerPill is no longer in mapping.json, using a default.
 
     for (const schedule of schedules) {
       // 스케줄의 요일과 시간 일치 확인 (대소문자 구분 없이 요일 비교)
       if (schedule.day.toLowerCase() === currentDayString.toLowerCase() && schedule.time === currentTimeString) {
         console.log(`[API GET] Matched schedule:`, schedule);
-        const mapping = mappings.find(m => m.supplementId === schedule.supplement);
         
-        if (mapping) {
-          // quantity 필드가 없다면 기본값 1로 간주 (schedules.json 업데이트 전까지의 호환성)
-          const quantity = schedule.quantity || 1; 
-          const totalRotations = quantity * mapping.rotationsPerPill;
+        const motorId = mappings[schedule.supplement]; // schedule.supplement is the supplement name (e.g., "비타민 C")
 
-          commandToSend = {
-            motorId: mapping.motorId,
-            rotations: totalRotations, // 계산된 총 회전 수
+        if (motorId !== undefined) { // Check if motorId is found (could be 0)
+          const quantity = schedule.quantity || 1;
+          const rotationsPerPill = DEFAULT_ROTATIONS_PER_PILL; // Using default
+          const totalRotations = quantity * rotationsPerPill;
+
+          commandsToSend.push({
+            motorId: motorId,
+            rotations: totalRotations,
             supplement: schedule.supplement,
             scheduleId: schedule.id,
             quantity: quantity,
-            rotationsPerPill: mapping.rotationsPerPill
-          };
-          console.log(`[API GET] Found mapping and prepared command:`, commandToSend);
-          break; 
+            rotationsPerPill: rotationsPerPill
+          });
+          console.log(`[API GET] Found mapping and prepared command:`, commandsToSend[commandsToSend.length-1]);
         } else {
-          console.warn(`[API GET] Schedule found for ${schedule.supplement}, but no mapping configured for it.`);
+          console.warn(`[API GET] Schedule found for ${schedule.supplement}, but no mapping configured for it in mapping.json (using supplement name as key).`);
         }
       }
     }
 
-    if (commandToSend) {
-      console.log('[API GET] Sending command to ESP32:', commandToSend);
-      return NextResponse.json(commandToSend, { status: 200 });
+    if (commandsToSend.length > 0) {
+      console.log('[API GET] Sending commands to ESP32:', commandsToSend);
+      return NextResponse.json(commandsToSend, { status: 200 });
     } else {
       console.log('[API GET] No command due at this time.');
       return NextResponse.json({ status: "no_command_due", checkedTime: currentTimeString, checkedDay: currentDayString }, { status: 200 });
     }
 
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[API /api/esp32/motor-command GET] Error processing request:', errorMessage, error);
-    return NextResponse.json({ error: 'Failed to process motor command request', details: errorMessage }, { status: 500 });
-  }
-}
+  } catch (error)

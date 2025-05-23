@@ -1,37 +1,18 @@
 [
   {
-    "id": "1746270618093-Saturday-비타민-E-4zf2v",
-    "supplement": "비타민 E",
-    "day": "Saturday",
-    "time": "21:10",
-    "timestamp": 1746270618093
-  },
-  {
-    "id": "1746863118100-Wednesday-비타민-C-w4la4",
+    "id": "68d36115-08f6-4acc-b347-2ad1c5ca40ea",
     "supplement": "비타민 C",
-    "day": "Wednesday",
-    "time": "17:50",
-    "timestamp": 1746863118100
-  },
-  {
-    "id": "2a1e4188-4966-4067-993b-d94f615a8e13",
-    "supplement": "비타민 C",
-    "day": "Thursday",
-    "time": "17:00",
-    "timestamp": 1747897309346
-  },
-  {
-    "id": "4332ffd6-ccf9-47c5-9672-aaa35008fb53",
-    "supplement": "비타민 D",
-    "day": "Thursday",
-    "time": "17:00",
-    "timestamp": 1747897338190
-  },
-  {
-    "id": "29c98f3f-8675-47c5-95b8-4b7963941327",
-    "supplement": "비타민 D",
     "day": "Tuesday",
-    "time": "17:00",
-    "timestamp": 1747897338215
+    "time": "09:45",
+    "quantity": 2,
+    "timestamp": 1747971776233
+  },
+  {
+    "id": "f0051702-2c16-4531-b351-15b355e5ec26",
+    "supplement": "비타민 C",
+    "day": "Saturday",
+    "time": "09:45",
+    "quantity": 2,
+    "timestamp": 1747971776264
   }
 ]

@@ -126,12 +126,12 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
           if (!sessionStorage.getItem(notificationKey)) { 
             toast({ 
                 title: '영양제 섭취 시간입니다.',
-                description: `섭취해야할 영양제 종류 : ${schedule.supplement}`,
+                description: `섭취해야할 영양제 종류 : ${schedule.supplement} (${schedule.quantity || 1}정)`,
                 duration: 10000, 
             });
             sessionStorage.setItem(notificationKey, 'true');
 
-            console.log(`[알림] ${schedule.supplement} 섭취 시간입니다. 디스펜스 API 호출 중...`);
+            console.log(`[알림] ${schedule.supplement} (${schedule.quantity || 1}정) 섭취 시간입니다. 디스펜스 API 호출 중...`);
             try {
                 if (mappingData === null) {
                     mappingData = await fetchMapping();
@@ -356,7 +356,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
         supplements: schedulesForDay.filter(schedule => schedule.time === time)
                                     .map(schedule => ({
                                       id: schedule.id,
-                                      supplement: schedule.supplement
+                                      supplement: schedule.supplement,
+                                      quantity: schedule.quantity || 1 // quantity 추가
                                     })) 
       }))
     };
@@ -456,7 +457,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
                         <div className="flex flex-col space-y-1">
                             {supplements.map((s) => (
                             <div key={s.id} className="flex items-center justify-between text-sm p-1 rounded hover:bg-secondary/50 group/item">
-                                <span className="pr-2 flex-grow min-w-0 break-words">{s.supplement}</span>
+                                <span className="pr-2 flex-grow min-w-0 break-words">{s.supplement} ({s.quantity}정)</span> {/* quantity 표시 */} 
                                 <Button
                                     variant="ghost"
                                     size="icon"
