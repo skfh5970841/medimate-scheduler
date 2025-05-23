@@ -90,7 +90,10 @@ export async function GET(request: NextRequest) {
     for (const schedule of schedules) {
       // 스케줄의 요일과 시간 일치 확인 (대소문자 구분 없이 요일 비교)
       if (schedule.day.toLowerCase() === currentDayString.toLowerCase() && schedule.time === currentTimeString) {
-        console.log(`[API GET] Matched schedule:`, schedule);
+        // Enhanced server-side notification log
+        console.info(`[SERVER ALARM] Medication schedule due for '${schedule.supplement}' (Quantity: ${schedule.quantity || 1}) at ${schedule.time} on ${schedule.day}.`);
+        // Detailed log for debugging
+        console.log(`[DEBUG] Full matched schedule object:`, schedule);
         
         const motorId = mappings[schedule.supplement]; // schedule.supplement is the supplement name (e.g., "비타민 C")
 
@@ -107,7 +110,7 @@ export async function GET(request: NextRequest) {
             quantity: quantity,
             rotationsPerPill: rotationsPerPill
           });
-          console.log(`[API GET] Found mapping and prepared command:`, commandsToSend[commandsToSend.length-1]);
+          console.log(`[API GET] Found mapping and prepared command for ESP32: Motor ${motorId}, Rotations ${totalRotations} for ${schedule.supplement}.`);
         } else {
           console.warn(`[API GET] Schedule found for ${schedule.supplement}, but no mapping configured for it in mapping.json (using supplement name as key).`);
         }
@@ -122,7 +125,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ status: "no_command_due", checkedTime: currentTimeString, checkedDay: currentDayString }, { status: 200 });
     }
 
-  } catch (error) {
+  } catch (error: any) { // Added type annotation for error
     console.error('[API /api/esp32/motor-command GET] Error processing request:', error);
     // It's important for the ESP32 to get a valid JSON response even on error,
     // or at least a clear error status.
