@@ -4,5 +4,6 @@ export type Schedule = {
   day: string;
   time: string;
   timestamp: number;
-  quantity: number; // Add quantity field
+  quantity: number;
+  lastExecutedAt?: number; // Timestamp of the last execution
 };
