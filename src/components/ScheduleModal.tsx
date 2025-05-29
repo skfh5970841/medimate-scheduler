@@ -7,61 +7,54 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {Button} from '@/components/ui/button';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
-import {Supplement} from '@/services/supplements'; // Assumes Supplement type is defined here or globally
-import {Schedule} from '@/types'; // Assumes Schedule type in @/types includes quantity
+import {Supplement, getSupplements} from '@/services/supplements'; // Import getSupplements
+import {Schedule} from '@/types';
 import {Checkbox} from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddSchedule: (schedule: Schedule) => void; // onAddSchedule now expects Schedule with quantity
+  onAddSchedule: (schedule: Schedule) => void;
 }
 
 export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, onAddSchedule}) => {
   const [supplement, setSupplement] = useState('');
-  const [newSupplement, setNewSupplement] = useState('');
+  const [newSupplement, setNewSupplement] = useState(''); // This might need to be re-evaluated or removed
   const [days, setDays] = useState<string[]>([]);
   const [time, setTime] = useState('');
-  const [quantity, setQuantity] = useState<number>(1); // State for quantity
+  const [quantity, setQuantity] = useState<number>(1);
   const [supplementsList, setSupplementsList] = useState<Supplement[]>([]);
 
   useEffect(() => {
-    const fetchSupplements = async () => {
+    const fetchSupplementsList = async () => {
       try {
-        const storedSupplements = localStorage.getItem('supplements');
-        if (storedSupplements) {
-          setSupplementsList(JSON.parse(storedSupplements));
-        } else {
-          setSupplementsList([
-            {id: 'vitamin-d', name: '비타민 D'},
-            {id: 'vitamin-c', name: '비타민 C'},
-            {id: 'calcium', name: '칼슘'},
-          ]);
-        }
+        const supplements = await getSupplements(); // Use getSupplements
+        setSupplementsList(supplements);
       } catch (error) {
-        console.error('Failed to fetch supplements from local storage:', error);
-        setSupplementsList([
-            {id: 'vitamin-d', name: '비타민 D'},
-            {id: 'vitamin-c', name: '비타민 C'},
-            {id: 'calcium', name: '칼슘'},
-        ]);
+        console.error('Failed to fetch supplements list:', error);
+        setSupplementsList([]); // Fallback to empty list on error
       }
     };
-    fetchSupplements();
-  }, []);
-
-  useEffect(() => {
-    if (supplementsList.length > 0) {
-        localStorage.setItem('supplements', JSON.stringify(supplementsList));
+    if (isOpen) { // Fetch supplements when modal is opened
+        fetchSupplementsList();
     }
-  }, [supplementsList]);
+  }, [isOpen]); // Re-fetch if modal is re-opened
+
+  // Remove useEffect that saves to localStorage, as supplements.json is the source of truth
+  // useEffect(() => {
+  //   if (supplementsList.length > 0) {
+  //       localStorage.setItem('supplements', JSON.stringify(supplementsList));
+  //   }
+  // }, [supplementsList]);
 
   const handleSubmit = () => {
-    const selectedSupplementName = supplement === 'newSupplement' ? newSupplement.trim() : supplement;
+    // Simplified: remove direct new supplement addition from this modal
+    // 영양제 추가는 영양제 관리 페이지에서 하도록 유도 (추후 개선 가능)
+    const selectedSupplementName = supplement;
 
     if (!selectedSupplementName) {
-      alert('영양제를 선택하거나 입력해주세요.');
+      alert('영양제를 선택해주세요.');
       return;
     }
      if (days.length === 0) {
@@ -77,38 +70,26 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
       return;
     }
 
-    if (supplement === 'newSupplement' && newSupplement) {
-      const trimmedNewSupplement = newSupplement.trim();
-      const newId = trimmedNewSupplement.toLowerCase().replace(/\s+/g, '-');
-      if (!supplementsList.some(s => s.id === newId || s.name.toLowerCase() === trimmedNewSupplement.toLowerCase())) {
-        const newSupplementObject: Supplement = {
-          id: newId, 
-          name: trimmedNewSupplement,
-        };
-        setSupplementsList(prevList => [...prevList, newSupplementObject]);
-      } else {
-          const existingSupplement = supplementsList.find(s => s.id === newId || s.name.toLowerCase() === trimmedNewSupplement.toLowerCase());
-          // if(existingSupplement) { // Optional: alert or use existing supplement's name }
-      }
-    }
+    // Logic for adding new supplement to supplementsList and potentially to supplements.json
+    // is removed for simplification. New supplements should be managed via supplements-admin page.
 
     days.forEach((day) => {
       const newSchedule: Schedule = {
         id: `${Date.now()}-${day}-${selectedSupplementName.replace(/\s+/g, '-')}-${Math.random().toString(36).substring(2, 7)}`,
-        supplement: selectedSupplementName,
+        supplement: selectedSupplementName, // This name comes from supplements.json via getSupplements
         day,
         time,
-        quantity: quantity, // Include quantity in the schedule object
+        quantity: quantity,
         timestamp: Date.now(),
       };
-      onAddSchedule(newSchedule); // This function should handle API call
+      onAddSchedule(newSchedule);
     });
 
     setSupplement('');
-    setNewSupplement('');
+    // setNewSupplement(''); // Removed as direct new supplement addition is removed
     setDays([]);
     setTime('');
-    setQuantity(1); // Reset quantity to default
+    setQuantity(1);
     onClose();
   };
 
@@ -134,7 +115,6 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
           <DialogTitle>스케줄 추가</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          {/* Supplement Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
             <Label htmlFor="supplement" className="text-left sm:text-right">영양제</Label>
             <div className="col-span-1 sm:col-span-3">
@@ -142,20 +122,20 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
                   <SelectTrigger id="supplement"><SelectValue placeholder="영양제 선택" /></SelectTrigger>
                   <SelectContent><ScrollArea className="h-48">
                         {supplementsList.map((s) => (<SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>))}
-                        <SelectItem value="newSupplement">새 영양제 추가</SelectItem>
+                        {/* <SelectItem value="newSupplement">새 영양제 추가</SelectItem> // Temporarily removed for simplification */}
                   </ScrollArea></SelectContent>
                 </Select>
             </div>
           </div>
 
+          {/* Input for new supplement name is removed for simplification
           {supplement === 'newSupplement' && (
             <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
               <Label htmlFor="newSupplement" className="text-left sm:text-right">새 이름</Label>
               <Input type="text" id="newSupplement" placeholder="새 영양제 이름 입력" value={newSupplement} onChange={(e) => setNewSupplement(e.target.value)} className="col-span-1 sm:col-span-3" />
             </div>
-          )}
+          )} */}
 
-          {/* Day Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-4 items-start gap-2 sm:gap-4">
              <Label htmlFor="day" className="text-left sm:text-right mt-1">요일</Label>
             <div className="col-span-1 sm:col-span-3 grid grid-cols-3 sm:grid-cols-4 gap-x-2 sm:gap-x-4 gap-y-2">
@@ -168,13 +148,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({isOpen, onClose, on
             </div>
           </div>
 
-          {/* Time Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
             <Label htmlFor="time" className="text-left sm:text-right">시간</Label>
             <Input type="time" id="time" value={time} onChange={(e) => setTime(e.target.value)} className="col-span-1 sm:col-span-3" />
           </div>
 
-          {/* Quantity Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
             <Label htmlFor="quantity" className="text-left sm:text-right">알약 개수</Label>
             <Input

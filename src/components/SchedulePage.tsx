@@ -142,6 +142,10 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({onLogout}) => {
                     console.log(`[디스펜스] ${schedule.supplement} -> 모터 ${motorNumber}. 명령 전송 중...`);
                     // TODO: Replace with your actual dispense API endpoint and payload
                 } else {
+                    // 디버깅 로그 추가
+                    console.log("DEBUG: schedule.supplement in checkSchedules:", schedule.supplement);
+                    console.log("DEBUG: mappingData in checkSchedules:", mappingData);
+
                     console.warn(`[디스펜스 경고] 영양제 ${schedule.supplement}에 대한 모터 매핑을 찾을 수 없습니다. 디스펜스 불가.`);
                      toast({
                          title: '매핑 오류',
