@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -55,7 +56,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
   const [isResetting, setIsResetting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const motorNumbers = [1, 2, 3, 4, 5, 6, 7, 8]; // Example motor numbers
+  const motorNumbers = [0, 1, 2, 3, 4, 5, 6, 7, 8]; // Include 0
 
   useEffect(() => {
     const fetchData = async () => {
@@ -116,7 +117,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
 
   useEffect(() => {
     // When selectedSupplement or currentMapping changes, update the selectedMotor
-    if (selectedSupplement && currentMapping[selectedSupplement]) {
+    if (selectedSupplement && currentMapping[selectedSupplement] !== undefined) { // Check for undefined explicitly
       setSelectedMotor(currentMapping[selectedSupplement].toString());
     } else {
       setSelectedMotor("");
@@ -126,7 +127,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selectedSupplement || !selectedMotor) {
+    if (!selectedSupplement || selectedMotor === "") { // Check if selectedMotor is empty string
       toast({
         title: '입력 오류',
         description: '영양제와 모터 번호를 모두 선택해주세요.',
@@ -308,7 +309,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
                      {Object.keys(currentMapping).length > 0 ? (
                         <ul className="space-y-1 text-sm text-muted-foreground">
                             {Object.entries(currentMapping)
-                                .sort(([, motorA], [, motorB]) => motorA - motorB)
+                                .sort(([, motorA], [, motorB]) => motorA - motorB) // Sort by motor number
                                 .map(([supplement, motor]) => (
                                 <li key={supplement} className="flex justify-between items-center">
                                     <span className="truncate pr-2">{supplement}</span>
@@ -429,7 +430,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
                     {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     선택 삭제
                 </Button>
-                <Button type="submit" disabled={isLoading || !selectedSupplement || !selectedMotor || isSubmitting || isDeleting || isResetting} className="w-full sm:w-auto">
+                <Button type="submit" disabled={isLoading || !selectedSupplement || selectedMotor === "" || isSubmitting || isDeleting || isResetting} className="w-full sm:w-auto">
                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                    저장
                 </Button>
@@ -440,3 +441,4 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
     </Dialog>
   );
 }
+

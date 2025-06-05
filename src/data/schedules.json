@@ -1,18 +1,10 @@
 [
   {
-    "id": "26b8840b-264b-4d59-ba7f-a22c3cbd7680",
+    "id": "3cbe04c7-cb54-478b-936a-75f042cf6605",
     "supplement": "Vitamin C",
     "day": "Thursday",
-    "time": "14:34",
+    "time": "15:40",
     "quantity": 1,
-    "timestamp": 1748496792320
-  },
-  {
-    "id": "bd7ddeb2-deb6-4543-ae04-284e02468909",
-    "supplement": "Vitamin C",
-    "day": "Thursday",
-    "time": "15:16",
-    "quantity": 1,
-    "timestamp": 1748499319644
+    "timestamp": 1748500752112
   }
 ]

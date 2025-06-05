@@ -3,10 +3,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label'; // Added missing Label import
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from '@/hooks/use-toast'; // Assuming use-toast hook is used as in SchedulePage
-import { PlusCircle, Edit3, Trash2, RefreshCw } from 'lucide-react'; // Icons
+import { toast } from '@/hooks/use-toast';
+import { PlusCircle, Edit3, Trash2, RefreshCw } from 'lucide-react';
 
 interface DispenserMapping {
   [key: string]: number;
@@ -22,11 +23,10 @@ export default function MappingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // States for adding/editing a mapping
   const [availableSupplements, setAvailableSupplements] = useState<Supplement[]>([]);
   const [selectedSupplement, setSelectedSupplement] = useState<string>('');
   const [motorNumber, setMotorNumber] = useState<string>('');
-  const [isEditing, setIsEditing] = useState<string | null>(null); // Stores the key of the mapping being edited
+  const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editMotorNumber, setEditMotorNumber] = useState<string>('');
 
   const fetchMappings = useCallback(async () => {
@@ -54,23 +54,12 @@ export default function MappingPage() {
 
   const fetchSupplements = useCallback(async () => {
     try {
-      // Assuming getSupplements function is adapted to be callable from client-side 
-      // or there's an API endpoint for supplements.
-      // For now, let's mock or use a direct fetch if supplements.json is in public folder or an API exists
-      // This part needs to align with how `getSupplements` in `supplements.ts` is actually exposed/works.
-      // If `supplements.json` is in `src/data` and not served, we need an API route for it.
-      // Let's create a temporary API route for supplements for this example.
-      const response = await fetch('/api/supplements'); // We'll need to create this API route
+      const response = await fetch('/api/supplements');
       if(!response.ok) {
         throw new Error('영양제 목록을 불러오는데 실패했습니다.');
       }
       const data: Supplement[] = await response.json();
       setAvailableSupplements(data);
-      if (data.length > 0) {
-        // Find first unmapped supplement or default to first one if all mapped
-        const firstUnmapped = data.find(s => !(s.name in mappings));
-        setSelectedSupplement(firstUnmapped ? firstUnmapped.name : data[0].name);
-      }
     } catch (err:any) {
       console.error("Fetch supplements error:", err);
       toast({
@@ -79,24 +68,48 @@ export default function MappingPage() {
         variant: 'destructive',
       });
     }
-  }, [mappings]); // Add mappings as dependency
+  }, []);
 
   useEffect(() => {
     fetchMappings();
-    fetchSupplements(); // Fetch supplements for the add/edit form
+    fetchSupplements();
   }, [fetchMappings, fetchSupplements]);
 
-  // Handler to add or update a mapping
+  const supplementOptions = availableSupplements.map(s => ({
+    value: s.name,
+    label: s.name,
+    disabled: mappings[s.name] !== undefined && s.name !== isEditing
+  }));
+
+  useEffect(() => {
+    if (availableSupplements.length > 0 && !isEditing) {
+      const firstUnmappedOption = supplementOptions.find(opt => !opt.disabled);
+      if (firstUnmappedOption) {
+        setSelectedSupplement(firstUnmappedOption.value);
+      } else if (supplementOptions.length > 0) {
+        // If all are mapped or no unmapped ones, select the first available (which might be disabled for selection)
+        // Or, if the current selectedSupplement is valid, keep it.
+        const currentSelectedIsValid = supplementOptions.some(opt => opt.value === selectedSupplement && !opt.disabled);
+        if(!currentSelectedIsValid) {
+            setSelectedSupplement(supplementOptions[0]?.value || ''); 
+        }
+      } else {
+        setSelectedSupplement(''); 
+      }
+    }
+     // If editing, selectedSupplement state is not changed here
+  }, [availableSupplements, mappings, isEditing, supplementOptions, selectedSupplement]);
+
+
   const handleSaveMapping = async () => {
-    if (isEditing) { // Update existing mapping
-      if (!editMotorNumber || isNaN(parseInt(editMotorNumber)) || parseInt(editMotorNumber) <=0 ) {
-        toast({ title: '오류', description: '유효한 모터 번호(0보다 큰 정수)를 입력해주세요.', variant: 'destructive' });
+    if (isEditing) {
+      if (!editMotorNumber || isNaN(parseInt(editMotorNumber)) || parseInt(editMotorNumber) < 0 ) {
+        toast({ title: '오류', description: '유효한 모터 번호(0 이상의 정수)를 입력해주세요.', variant: 'destructive' });
         return;
       }
       const supplementKey = isEditing;
       const motorNum = parseInt(editMotorNumber);
 
-      // Check if new motor number is already used by another supplement
       const existingSupplementForMotor = Object.entries(mappings).find(
         ([sup, motor]) => motor === motorNum && sup !== supplementKey
       );
@@ -104,9 +117,7 @@ export default function MappingPage() {
         toast({ title: '충돌 오류', description: `모터 ${motorNum}번은 이미 '${existingSupplementForMotor[0]}'에 할당되어 있습니다.`, variant: 'destructive' });
         return;
       }
-
       const updatedMapping = { [supplementKey]: motorNum };
-
       try {
         const response = await fetch('/api/dispenser-mapping', {
           method: 'POST',
@@ -125,28 +136,23 @@ export default function MappingPage() {
         console.error("Update mapping error:", err);
         toast({ title: '오류', description: err.message || '매핑 업데이트 중 오류 발생', variant: 'destructive' });
       }
-
-    } else { // Add new mapping
-      if (!selectedSupplement || !motorNumber || isNaN(parseInt(motorNumber)) || parseInt(motorNumber) <=0) {
-        toast({ title: '오류', description: '영양제를 선택하고 유효한 모터 번호(0보다 큰 정수)를 입력해주세요.', variant: 'destructive' });
+    } else {
+      if (!selectedSupplement || !motorNumber || isNaN(parseInt(motorNumber)) || parseInt(motorNumber) < 0) {
+        toast({ title: '오류', description: '영양제를 선택하고 유효한 모터 번호(0 이상의 정수)를 입력해주세요.', variant: 'destructive' });
         return;
       }
+      // Check if the selected supplement is already mapped (it should be disabled in dropdown, but double check)
       if (mappings[selectedSupplement] !== undefined) {
         toast({ title: '오류', description: `'${selectedSupplement}'은(는) 이미 매핑되어 있습니다. 기존 항목을 수정해주세요.`, variant: 'destructive' });
         return;
       }
       const motorNum = parseInt(motorNumber);
-      // Check if motor number is already used
-      const existingSupplementForMotor = Object.entries(mappings).find(
-        ([, motor]) => motor === motorNum
-      );
+      const existingSupplementForMotor = Object.entries(mappings).find(([, motor]) => motor === motorNum);
       if (existingSupplementForMotor) {
         toast({ title: '충돌 오류', description: `모터 ${motorNum}번은 이미 '${existingSupplementForMotor[0]}'에 할당되어 있습니다.`, variant: 'destructive' });
         return;
       }
-
       const newMapping = { [selectedSupplement]: motorNum };
-
       try {
         const response = await fetch('/api/dispenser-mapping', {
           method: 'POST',
@@ -159,10 +165,8 @@ export default function MappingPage() {
         }
         toast({ title: '성공', description: `'${selectedSupplement}'이(가) 모터 ${motorNumber}에 할당되었습니다.` });
         setMappings(prev => ({ ...prev, ...newMapping }));
-        // Reset to first unmapped or first available supplement
-        const firstUnmapped = availableSupplements.find(s => !(s.name in {...mappings, ...newMapping}));
-        setSelectedSupplement(firstUnmapped ? firstUnmapped.name : (availableSupplements.length > 0 ? availableSupplements[0].name : ''));
         setMotorNumber('');
+        // selectedSupplement state will be updated by the useEffect hook
       } catch (err: any) {
         console.error("Add mapping error:", err);
         toast({ title: '오류', description: err.message || '매핑 추가 중 오류 발생', variant: 'destructive' });
@@ -172,7 +176,6 @@ export default function MappingPage() {
 
   const handleDeleteMapping = async (supplementName: string) => {
     if (!confirm(`'${supplementName}' 매핑을 삭제하시겠습니까?`)) return;
-
     try {
       const response = await fetch(`/api/dispenser-mapping?supplementName=${encodeURIComponent(supplementName)}`, {
         method: 'DELETE',
@@ -189,11 +192,7 @@ export default function MappingPage() {
         setIsEditing(null);
         setEditMotorNumber('');
       }
-       // After deleting, if the selectedSupplement was the one deleted, reset it
-      if (selectedSupplement === supplementName) {
-        const firstUnmapped = availableSupplements.find(s => !(s.name in newMappings));
-        setSelectedSupplement(firstUnmapped ? firstUnmapped.name : (availableSupplements.length > 0 ? availableSupplements[0].name : ''));
-      }
+      // selectedSupplement state will be updated by the useEffect hook if the deleted one was selected
     } catch (err: any) {
       console.error("Delete mapping error:", err);
       toast({ title: '오류', description: err.message || '매핑 삭제 중 오류 발생', variant: 'destructive' });
@@ -203,15 +202,7 @@ export default function MappingPage() {
   const handleEditClick = (supplementName: string, currentMotorNumber: number) => {
     setIsEditing(supplementName);
     setEditMotorNumber(String(currentMotorNumber));
-    // Scroll to the edit form or highlight it if it's a modal/separate section
   };
-
-  const supplementOptions = availableSupplements.map(s => ({
-    value: s.name,
-    label: s.name,
-    disabled: mappings[s.name] !== undefined && s.name !== isEditing // Disable if already mapped and not editing it
-  }));
-
 
   if (isLoading && Object.keys(mappings).length === 0 && availableSupplements.length === 0) return <div className="p-4 text-center">매핑 정보를 불러오는 중...</div>;
 
@@ -220,28 +211,24 @@ export default function MappingPage() {
       <Card className="mb-6 shadow-lg rounded-xl">
         <CardHeader className="bg-muted/30 rounded-t-xl">
           <CardTitle className="text-lg sm:text-xl">
-            {isEditing 
-              ? `'${isEditing}' 매핑 수정` 
-              : '새 영양제 매핑 추가'}
+            {isEditing ? `'${isEditing}' 매핑 수정` : '새 영양제 매핑 추가'}
           </CardTitle>
           <CardDescription>
-            {isEditing 
-              ? `모터 번호를 수정합니다. 다른 영양제에 이미 할당된 번호는 사용할 수 없습니다.` 
-              : '목록에서 영양제를 선택하고 사용하지 않는 모터 번호를 할당하세요.'}
+            {isEditing ? '모터 번호를 수정합니다. 다른 영양제에 이미 할당된 번호는 사용할 수 없습니다.' : '목록에서 영양제를 선택하고 사용하지 않는 모터 번호를 할당하세요.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
           {isEditing ? (
             <div>
-              <Label htmlFor="editMotorNumber" className="block text-sm font-medium mb-1">모터 번호 (1 이상의 정수)</Label>
+              <Label htmlFor="editMotorNumber" className="block text-sm font-medium mb-1">모터 번호 (0 이상의 정수)</Label>
               <Input 
                 id="editMotorNumber"
                 type="number" 
                 value={editMotorNumber} 
                 onChange={(e) => setEditMotorNumber(e.target.value)} 
-                placeholder="모터 번호 (예: 1)"
+                placeholder="모터 번호 (예: 0)"
                 className="w-full"
-                min="1"
+                min="0"
               />
             </div>
           ) : (
@@ -253,10 +240,12 @@ export default function MappingPage() {
                   value={selectedSupplement} 
                   onChange={(e) => setSelectedSupplement(e.target.value)}
                   className="w-full p-2 border rounded-md bg-background disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={availableSupplements.length === 0 || availableSupplements.every(s => s.disabled)}
+                  disabled={availableSupplements.length === 0 || supplementOptions.every(opt => opt.disabled)}
                 >
                   {availableSupplements.length === 0 && <option value="">로딩 중...</option>}
-                  {availableSupplements.every(s => s.disabled) && selectedSupplement === '' && <option value="">모든 영양제가 매핑됨</option>}
+                  {availableSupplements.length > 0 && supplementOptions.every(opt => opt.disabled) && 
+                    (!selectedSupplement || supplementOptions.find(opt => opt.value === selectedSupplement)?.disabled) && 
+                    <option value="">모든 영양제가 매핑됨</option>}
                   {supplementOptions.map(opt => (
                     <option key={opt.value} value={opt.value} disabled={opt.disabled}>
                       {opt.label} {opt.disabled ? '(이미 매핑됨)' : ''}
@@ -265,16 +254,16 @@ export default function MappingPage() {
                 </select>
               </div>
               <div>
-                <Label htmlFor="motorNumber" className="block text-sm font-medium mb-1">모터 번호 (1 이상의 정수)</Label>
+                <Label htmlFor="motorNumber" className="block text-sm font-medium mb-1">모터 번호 (0 이상의 정수)</Label>
                 <Input 
                   id="motorNumber"
                   type="number" 
                   value={motorNumber} 
                   onChange={(e) => setMotorNumber(e.target.value)} 
-                  placeholder="모터 번호 (예: 1)"
+                  placeholder="모터 번호 (예: 0)"
                   className="w-full"
-                  disabled={availableSupplements.length === 0 || !selectedSupplement}
-                  min="1"
+                  disabled={availableSupplements.length === 0 || !selectedSupplement || supplementOptions.find(opt => opt.value === selectedSupplement)?.disabled }
+                  min="0"
                 />
               </div>
             </>
@@ -283,13 +272,13 @@ export default function MappingPage() {
         <CardFooter className="flex flex-col sm:flex-row justify-between items-center bg-muted/30 rounded-b-xl p-4 space-y-2 sm:space-y-0">
           <Button 
             onClick={handleSaveMapping} 
-            disabled={isLoading || (isEditing ? !editMotorNumber : !selectedSupplement || !motorNumber)}
+            disabled={isLoading || (isEditing ? !editMotorNumber : (!selectedSupplement || !motorNumber || supplementOptions.find(opt => opt.value === selectedSupplement)?.disabled))}
             className="w-full sm:w-auto"
           >
             <PlusCircle className="mr-2 h-4 w-4" /> {isEditing ? '수정 저장' : '매핑 추가'}
           </Button>
           {isEditing && (
-            <Button variant="outline" onClick={() => { setIsEditing(null); setEditMotorNumber(''); }} className="w-full sm:w-auto">취소</Button>
+            <Button variant="outline" onClick={() => { setIsEditing(null); setEditMotorNumber(''); setSelectedSupplement(supplementOptions.find(opt => !opt.disabled)?.value || ''); }} className="w-full sm:w-auto">취소</Button>
           )}
         </CardFooter>
       </Card>
@@ -298,14 +287,14 @@ export default function MappingPage() {
         <CardHeader className="bg-muted/30 rounded-t-xl">
           <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
             <CardTitle className="text-lg sm:text-xl">현재 디스펜서 매핑</CardTitle>
-            <Button variant="outline" size="icon" onClick={fetchMappings} disabled={isLoading} title="새로고침">
+            <Button variant="outline" size="icon" onClick={() => { fetchMappings(); fetchSupplements();}} disabled={isLoading} title="새로고침">
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
           <CardDescription>각 영양제가 할당된 모터 번호를 보여줍니다. 수정 또는 삭제할 수 있습니다.</CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          {isLoading && Object.keys(mappings).length === 0 && <p className="text-center text-muted-foreground">로딩 중...</p>}
+          {isLoading && Object.keys(mappings).length === 0 && availableSupplements.length === 0 && <p className="text-center text-muted-foreground">로딩 중...</p>}
           {error && <p className="text-red-500 text-center">{error}</p>}
           {!isLoading && !error && Object.keys(mappings).length === 0 && (
             <p className="text-center text-muted-foreground">현재 설정된 매핑 정보가 없습니다. 위에서 새 매핑을 추가해주세요.</p>
@@ -322,7 +311,7 @@ export default function MappingPage() {
                 </TableHeader>
                 <TableBody>
                   {Object.entries(mappings)
-                    .sort(([, motorA], [, motorB]) => motorA - motorB) // Sort by motor number
+                    .sort(([, motorA], [, motorB]) => motorA - motorB)
                     .map(([supplement, motor]) => (
                     <TableRow key={supplement}>
                       <TableCell className="font-medium">{supplement}</TableCell>

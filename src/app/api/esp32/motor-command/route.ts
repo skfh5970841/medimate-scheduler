@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { formatInTimeZone, utcToZonedTime } from 'date-fns-tz'; // Import for timezone
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz'; // Import for timezone
 
 // Data file paths
 const schedulesFilePath = path.join(process.cwd(), 'src/data', 'schedules.json');
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     }
 
     const nowUtc = new Date();
-    const nowInTargetTimezone = utcToZonedTime(nowUtc, TARGET_TIMEZONE);
+    const nowInTargetTimezone = toZonedTime(nowUtc, TARGET_TIMEZONE);
 
     const currentDayString = formatInTimeZone(nowUtc, TARGET_TIMEZONE, 'EEEE'); // e.g., "Thursday"
     const currentTimeString = formatInTimeZone(nowUtc, TARGET_TIMEZONE, 'HH:mm'); // e.g., "14:34"
