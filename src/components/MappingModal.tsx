@@ -359,7 +359,7 @@ export function MappingModal({ isOpen, onClose }: MappingModalProps) {
                 <Select
                   value={selectedMotor}
                   onValueChange={setSelectedMotor}
-                  disabled={!selectedSupplement || isLoading}
+                  disabled={isLoading}
                 >
                   <SelectTrigger id="motor">
                     <SelectValue placeholder="모터 선택" />
