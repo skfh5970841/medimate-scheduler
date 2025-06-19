@@ -5,5 +5,5 @@ export type Schedule = {
   time: string;
   timestamp: number;
   quantity: number;
-  lastExecutedAt?: number; // Timestamp of the last execution
+  lastExecutedAt?: number; 
 };

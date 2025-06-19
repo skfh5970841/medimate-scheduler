@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {useState} from 'react';
@@ -87,7 +86,7 @@ export const Login: React.FC<LoginProps> = ({onLogin}) => {
         <CardTitle>{isRegistering ? '회원가입' : '로그인'}</CardTitle>
         <CardDescription>
           {isRegistering
-            ? '계정을 생성하여 스케줄을 관리하세요.'
+            ? '계정을 생성하여 스케줄을 관리하세요'
             : ''}
         </CardDescription>
       </CardHeader>
